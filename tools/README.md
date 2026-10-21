@@ -18,3 +18,7 @@ Requires `pip install CoolProp numpy scipy`. Paths in `patch_site.py` point at t
 - `gen_exam2.py` builds the 20 Exam 2 templates (24 versions each): devices (E1–E5), heat exchangers and mixing (E6–E9), second law (E10–E12), isentropic efficiency and entropy generation (E13–E15), Otto/Diesel/dual/Brayton (E16–E20). Writes `exam2_templates.json`.
 - `check_exam2.py` re-solves every version independently (CoolProp for water and R-134a, analytic ideal gases, direct c_p integration for air) and flags any answer more than 70% of its tolerance away.
 - `patch_exam2.py` runs after `patch_site.py` and adds the templates, the T-s and P-v sketches, the Exam 1/Exam 2 switch on the practice exam, and the Exam 2 home track.
+
+## Bunny progress track (Oct 21, 2026)
+
+- `patch_bunny.py` runs after `patch_exam2.py`. It replaces the locomotive on the home page with the course bunny (engineer's cap, red neckerchief), which sits nibbling at the first lettuce whose topic isn't solid yet. A lettuce disappears (leaving a few crumbs and a green check on its label) once two of that topic's problems are solid. On phones the track keeps its size and scrolls sideways to the bunny.
