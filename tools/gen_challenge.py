@@ -947,6 +947,454 @@ def C16(rng):
                 0, "Entropy generation is a map of where the losses are. Shrinking the evaporator's temperature gap (a bigger exchanger) or recovering work in the expansion both cut it, at a cost. Comparing the two numbers tells you where the money buys the most.")]
     return stem, parts, steps, None, prm(locals())
 
+# =================================================================== Remade from past exams (P-series), Nov 9 2026
+# Modeled on Matthew's old Exam 2s (F24, F25, remake F25) and Finals (F23, F25). New numbers, fixed errors, harder where it helps.
+import CoolProp.CoolProp as _CP
+_CP.set_reference_state("R134a", "ASHRAE")
+HP_BTUS = 2544.43 / 3600          # 1 hp in Btu/s
+BTUS_KW = 1.055056                # 1 Btu/s in kW
+CPE, CVE, RE = 0.240, 0.171, 0.06855   # air, A-2Ea / A-1E (Btu/lbm·R)
+R0 = 459.67
+def fF(t): return f"{t:g} °F"
+def _K(TF): return (TF - 32) / 1.8 + 273.15
+def wE(TF):
+    T = _K(TF)
+    return {"P": float(f"{_CP.PropsSI('P', 'T', T, 'Q', 0, 'Water') / 6894.757:.4g}"), "vf": float(f"{16.0185 / _CP.PropsSI('D', 'T', T, 'Q', 0, 'Water'):.5f}"),
+            "hf": round(_CP.PropsSI("H", "T", T, "Q", 0, "Water") / 2326, 2), "sf": round(_CP.PropsSI("S", "T", T, "Q", 0, "Water") / 4186.8, 5)}
+def rE(TF):
+    T = _K(TF); g = lambda o, q: _CP.PropsSI(o, "T", T, "Q", q, "R134a")
+    hf, hg = round(g("H", 0) / 2326, 2), round(g("H", 1) / 2326, 2); sf, sg_ = round(g("S", 0) / 4186.8, 5), round(g("S", 1) / 4186.8, 5)
+    return {"P": float(f"{g('P', 0) / 6894.757:.4g}"), "hf": hf, "hg": hg, "hfg": round(hg - hf, 2), "sf": sf, "sg": sg_}
+
+ec.LIB.update({
+    "sink":   ("The river is the only heat sink", "All of the plant's waste heat goes into the river, which warms from T<sub>1</sub> to T<sub>2</sub>."),
+    "poly":   ("Polytropic, quasi-equilibrium", "The compression follows PV<sup>n</sup> = constant through quasi-equilibrium states."),
+    "pic":    ("Perfect intercooling", "The intercooler brings the air back to T<sub>1</sub> at constant pressure."),
+    "equalr": ("Equal pressure ratio per stage", "Both stages have the same pressure ratio, P<sub>x</sub>/P<sub>1</sub> = P<sub>2</sub>/P<sub>x</sub>."),
+    "same":   ("Same gas on both sides", "Both compartments hold air, so after mixing there is simply air at T<sub>f</sub> and P<sub>f</sub>; no separate mixing term."),
+    "loss":   ("Heat loss proportional to ΔT", "The house loses heat at a rate k(T<sub>in</sub> − T<sub>out</sub>)."),
+    "frac":   ("COP a fixed fraction of Carnot", "The real heat pump's COP stays the same fraction of the Carnot COP at every outdoor temperature."),
+    "constc_air": ("Constant specific heats", "Rule 4: the temperature changes are small, so constant c<sub>p</sub> and c<sub>v</sub> for air (A-2Ea) are fine."),
+})
+
+def past(tid, title, ch, slot, pts, tier, note, us=False):
+    def deco(fn):
+        TEMPLATES.append(dict(id=tid, title=title, ch=ch, slot=slot, pts=pts, tier=tier, fn=fn, grp="past", note=note, us=us))
+        return fn
+    return deco
+
+# ------------------------------------------------------------------ P1: lake-source heat pump (US units)
+@past("P1", "Lake-source heat pump for an animal shelter", 6, "C", 16, "challenge", "Old Exam 2, heat pump with an R-134a evaporator on lake water", us=True)
+def P1(rng):
+    W = rng.choice([0.5, 1, 2, 3, 5, 8]); TH = rng.choice([68, 70, 72, 75]); Twi = rng.choice([45, 50, 55, 60]); dT = rng.choice([5, 10, 15])
+    Two = Twi - dT; assert Two >= 35
+    Te = rng.choice([t for t in (10, 15, 20, 25) if t <= Two - 10]); xin = rng.choice([0.20, 0.25, 0.30, 0.35]); mw = rng.choice([0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0])
+    w1, w2, r = wE(Twi), wE(Two), rE(Te)
+    QL = mw * (w1["hf"] - w2["hf"]); hin = r["hf"] + xin * r["hfg"]; mR = QL / (r["hg"] - hin)
+    Wb = W * HP_BTUS; QH = QL + Wb; COP = QH / Wb; COPC = (TH + R0) / (TH - Twi)
+    ratio = COP / COPC; assert not 0.85 < ratio < 1.15 and COP > 1.5
+    verdict = "impossible: its COP beats Carnot" if COP > COPC else "possible, an actual (irreversible) heat pump"
+    stem = (f"A {W}-hp heat pump with R-134a as the working fluid keeps a small animal shelter at {fF(TH)}. Its heat comes from a lake: {mw} lbm/s of lake water enters an insulated evaporator at {fF(Twi)} "
+            f"and leaves at {fF(Two)}. The R-134a enters the evaporator at {fF(Te)} with a quality of {xin} and leaves as saturated vapor. Determine (a) the refrigerant's mass flow rate, "
+            "(b) the rate of heat delivered to the shelter, (c) the heat pump's COP, and (d) whether this is an actual, reversible or impossible heat pump (enter the Carnot COP, using the lake as the cold reservoir).")
+    parts = [part("a", "R-134a mass flow, ṁ<sub>R</sub>", "lbm/s", mR, 0.01, 4,
+                  [(QL / r["hfg"], "The R-134a enters as a mixture, so each pound absorbs h<sub>g</sub> − h<sub>in</sub>, not all of h<sub>fg</sub>."), (mw * dT / (r["hg"] - hin), "Tables first for the lake water: h<sub>f</sub> at each temperature (A-4E).")]),
+             part("b", "Heat to the shelter, Q̇<sub>H</sub>", "Btu/h", QH * 3600, 0.01, 4,
+                  [(QL * 3600, "That's the heat from the lake. The shelter also gets the compressor's work: Q̇<sub>H</sub> = Q̇<sub>L</sub> + Ẇ."), ((QL - Wb) * 3600, "Work is added to Q̇<sub>L</sub>, not subtracted."),
+                   ((QL + W * 2544.43 / 60) * 3600 if False else None, "")]),
+             part("c", "COP of the heat pump", "", COP, 0.01, 4, [(QL / Wb, "That's the refrigerator COP. For a heat pump, COP = Q̇<sub>H</sub>/Ẇ.")]),
+             part("d", "Carnot COP (shelter vs. lake)", "", COPC, 0.01, 4, [(TH / (TH - Twi), "Carnot needs absolute temperatures: °F + 459.67."), ((Twi + R0) / (TH - Twi), "That's the Carnot refrigerator COP. For a heat pump use T<sub>H</sub>/(T<sub>H</sub> − T<sub>L</sub>).")])]
+    steps = [self_step("Find the refrigerant flow, the heat delivered, the COP, and whether the heat pump is possible. Plan: the evaporator's energy balance gives ṁ<sub>R</sub> and Q̇<sub>L</sub>; the heat pump's first law gives Q̇<sub>H</sub>; Carnot gives the verdict."),
+             mc(2, "Check the temperatures before you calculate. Why does the R-134a have to be colder than the lake water leaving the evaporator?",
+                [f"Heat flows only from hot to cold: to pull heat out of water that leaves at {fF(Two)}, the refrigerant must be below that temperature",
+                 "It doesn't; any refrigerant temperature works", "So that it stays a liquid", "Because R-134a can't exist above 32 °F"],
+                0, f"Here the R-134a boils at {fF(Te)}, below the water's exit temperature of {fF(Two)}, so heat can flow from the water into it. A version of this problem with the refrigerant warmer than the lake would be impossible before any calculation."),
+             assume([f"Ẇ<sub>in</sub> = {W} hp", f"Shelter {fF(TH)}", f"Lake water: {mw} lbm/s, {fF(Twi)} → {fF(Two)}", f"R-134a: {fF(Te)}, x = {xin} → saturated vapor"],
+                    ["ṁ<sub>R</sub> (lbm/s)", "Q̇<sub>H</sub> (Btu/h)", "COP", "COP<sub>Carnot</sub>"],
+                    [("open", True, "Both fluids flow through the evaporator."), ("steady", True, "Steady operation."), ("adiabatic", True, "The evaporator is insulated.", "The evaporator is insulated: its only heat transfer is between the two streams."),
+                     ("noshaft", True, "The evaporator has no shaft or wires."), ("lowke", True, "Small velocities."), ("nope", True, "Same height."),
+                     ("r134", True, "Rule 1: R-134a from A-11E (saturated, by temperature)."), ("liqT", True, "Rule 1: lake water h from A-4E at its temperature."),
+                     ("reservoir", True, "Shelter and lake are big enough to stay at their temperatures.", "The shelter and the lake act as reservoirs for the Carnot limit."),
+                     ("cpwater", False, "Tables first for water."), ("rev", False, "That's what part (d) tests; don't assume it.")]),
+             multi([("Evaporator: ṁ<sub>R</sub>(h<sub>g</sub> − h<sub>in</sub>) = ṁ<sub>w</sub>(h<sub>w,in</sub> − h<sub>w,out</sub>) = Q̇<sub>L</sub>", True, ""), ("Heat pump: Q̇<sub>H</sub> = Q̇<sub>L</sub> + Ẇ<sub>in</sub>", True, ""),
+                    ("COP<sub>HP</sub> = Q̇<sub>H</sub>/Ẇ<sub>in</sub>; COP<sub>HP,Carnot</sub> = T<sub>H</sub>/(T<sub>H</sub> − T<sub>L</sub>), in R", True, ""), (FIRST_SF, True, ""),
+                    ("COP = Q̇<sub>L</sub>/Ẇ", False, "That's a refrigerator's COP.")], FIRST_SF),
+             multi_terms(["ṁ<sub>R</sub>h<sub>in</sub>", "ṁ<sub>w</sub>h<sub>w,in</sub>"], ["ṁ<sub>R</sub>h<sub>g</sub>", "ṁ<sub>w</sub>h<sub>w,out</sub>"], "ṁ<sub>R</sub>(h<sub>g</sub> − h<sub>in</sub>) = ṁ<sub>w</sub>(h<sub>w,in</sub> − h<sub>w,out</sub>)",
+                         p="Apply the steady-flow first law to the whole evaporator (both streams inside). Cross out every term that drops."),
+             props([("h<sub>f</sub> at T<sub>evap</sub>", r["hf"], "Btu/lbm", "A-11E", 0.004, fF(Te)), ("h<sub>fg</sub> at T<sub>evap</sub>", r["hfg"], "Btu/lbm", "A-11E", 0.003, fF(Te)),
+                    ("h<sub>g</sub> at T<sub>evap</sub>", r["hg"], "Btu/lbm", "A-11E", 0.003, fF(Te)),
+                    ("h<sub>w,in</sub> = h<sub>f</sub>", w1["hf"], "Btu/lbm", "A-4E", 0.004, fF(Twi)), ("h<sub>w,out</sub> = h<sub>f</sub>", w2["hf"], "Btu/lbm", "A-4E", 0.004, fF(Two))]),
+             calc([f"Q̇<sub>L</sub> = ṁ<sub>w</sub>(h<sub>w,in</sub> − h<sub>w,out</sub>) = {mw}({num(w1['hf'], 2)} − {num(w2['hf'], 2)}) = {sg(QL)} Btu/s",
+                   f"h<sub>in</sub> = h<sub>f</sub> + xh<sub>fg</sub> = {num(r['hf'], 2)} + {xin}({num(r['hfg'], 2)}) = {sg(hin, 5)} Btu/lbm",
+                   f"ṁ<sub>R</sub> = Q̇<sub>L</sub>/(h<sub>g</sub> − h<sub>in</sub>) = {sg(QL)}/({num(r['hg'], 2)} − {sg(hin, 5)}) = <b>{sg(mR)} lbm/s</b>",
+                   f"Ẇ<sub>in</sub> = {W} hp × (2544.43 Btu/h per hp) ÷ 3600 = {sg(Wb)} Btu/s",
+                   f"Q̇<sub>H</sub> = Q̇<sub>L</sub> + Ẇ = {sg(QL)} + {sg(Wb)} = {sg(QH)} Btu/s = <b>{sg(QH * 3600)} Btu/h</b>",
+                   f"COP = Q̇<sub>H</sub>/Ẇ = <b>{sg(COP)}</b>; COP<sub>Carnot</sub> = {num(TH + R0, 2)}/({TH} − {Twi}) = <b>{sg(COPC)}</b>, so the heat pump is {verdict}"]),
+             mc(8, "What's the most useful check on your verdict?",
+                ["Compare COP with COP<sub>Carnot</sub>: below means real, equal means reversible, above means impossible. Real heat pumps typically reach well under half of Carnot",
+                 "Check that Q̇<sub>H</sub> &gt; Q̇<sub>L</sub>; if so, it's possible", "Any COP above 1 is impossible", "Heat pumps can't use lake water"],
+                0, "The first law is happy with any numbers that add up. The second law caps the COP. A claimed COP close to or above Carnot should make you suspicious of the measurements.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P2: river-limited power plant (US units)
+@past("P2", "Most power a river can carry away", 6, "D", 14, "hardest", "Old Exam 2, maximum power with a river temperature limit", us=True)
+def P2(rng):
+    TH = rng.choice([800, 1000, 1200, 1500]); Vd = rng.choice([1000, 1500, 2000, 2500, 3000]); T1 = rng.choice([50, 55, 60, 65, 70]); dT = rng.choice([5, 10]); T2 = T1 + dT
+    w1, w2 = wE(T1), wE(T2); m = Vd / w1["vf"]
+    QL = m * (w2["hf"] - w1["hf"]); dS = m * (w2["sf"] - w1["sf"]); THR = TH + R0
+    QH = THR * dS; Wmax = QH - QL; WMW = Wmax * BTUS_KW / 1000; eta = Wmax / QH
+    Wsimple = QL * (THR / (T1 + R0) - 1) * BTUS_KW / 1000
+    stem = (f"A power plant receives heat at an average temperature of {fF(TH)} and rejects its waste heat to a river. Upstream, the river carries {Vd:,} ft³/s at {fF(T1)}. "
+            f"A permit says the river can be no warmer than {fF(T2)} downstream. Determine (a) the river's mass flow rate, (b) the most heat the plant may reject to the river, "
+            "(c) the maximum theoretical power the plant could produce, in MW, and (d) the plant's thermal efficiency at that limit.")
+    parts = [part("a", "River mass flow, ṁ", "lbm/s", m, 0.008, 3, [(Vd * 62.4, "Close, but read ρ (or v<sub>f</sub>) at the river's temperature from A-4E.") if abs(Vd * 62.4 / m - 1) > 0.012 else (None, "")]),
+             part("b", "Heat to the river, Q̇<sub>L</sub>", "Btu/s", QL, 0.01, 3, [(m * 1.0 * dT * 1.03 if False else None, "")]),
+             part("c", "Maximum power, Ẇ<sub>max</sub>", "MW", WMW, 0.015, 5, [(QL * (THR / (T1 + R0)) * BTUS_KW / 1000, "That's Q̇<sub>H</sub>. Power is Q̇<sub>H</sub> − Q̇<sub>L</sub>."),
+                                                                          (QL * (TH / T1 - 1) * BTUS_KW / 1000, "Carnot needs absolute temperatures (°F + 459.67)."),
+                                                                          (QL * BTUS_KW / 1000, "That's the heat to the river, not the power.")]),
+             part("d", "Efficiency at the limit, η", "%", pct(eta), 0.01, 3, [(pct(1 - (T1 + R0) / THR) if abs(1 - (T1 + R0) / THR - eta) / eta > 0.02 else None, "")])]
+    steps = [self_step("Find the river's flow, the most heat it may take, and the most power a plant could make while respecting the river's temperature limit. Plan: the river's temperature limit caps Q̇<sub>L</sub>; a reversible plant (S<sub>gen</sub> = 0) gives the most power for that Q̇<sub>L</sub>."),
+             mc(2, "Draw the energy flows. Which picture is right?",
+                ["Heat Q̇<sub>H</sub> in from the source at T<sub>H</sub>; power out; waste heat Q̇<sub>L</sub> out to the river, which warms from T<sub>1</sub> to T<sub>2</sub>",
+                 "Heat in from the river; power out", "Power in; heat out to the river", "Heat in from the source; all of it becomes power"],
+                0, "The river is the cold reservoir, but it isn't quite a reservoir: it warms a little as it takes the heat. That detail is the difference between the quick Carnot estimate and the exact limit."),
+             assume([f"T<sub>H</sub> = {fF(TH)}", f"River: {Vd:,} ft³/s at {fF(T1)}", f"Limit: {fF(T2)} downstream"], ["ṁ (lbm/s)", "Q̇<sub>L</sub> (Btu/s)", "Ẇ<sub>max</sub> (MW)", "η (%)"],
+                    [("cycle", True, "The plant runs in a cycle."), ("steady", True, "Steady operation.", "Steady operation: all rates are constant."), ("sink", True, "Given."),
+                     ("liqT", True, "Rule 1: river water h, s and v from A-4E."), ("rev2", True, "For the maximum power."),
+                     ("cpwater", False, "Tables first for water."), ("adiabatic", False, "A power plant must reject heat (Kelvin-Planck).")]),
+             multi([("ṁ = V̇/v<sub>f</sub>", True, ""), ("Q̇<sub>L</sub> = ṁ(h<sub>2</sub> − h<sub>1</sub>)", True, ""),
+                    ("Entropy balance on plant + river, S<sub>gen</sub> = 0: Q̇<sub>H</sub>/T<sub>H</sub> = ṁ(s<sub>2</sub> − s<sub>1</sub>)", True, ""), ("Ẇ<sub>max</sub> = Q̇<sub>H</sub> − Q̇<sub>L</sub>", True, ""),
+                    ("η = Ẇ/Q̇<sub>H</sub>", True, ""), ("Ẇ = Q̇<sub>L</sub>", False, "The river takes the waste heat, not the power.")], FIRST_CYC),
+             cycle_terms("Q̇<sub>H</sub>", "Q̇<sub>L</sub>", False, "Ẇ<sub>out</sub> = Q̇<sub>H</sub> − Q̇<sub>L</sub>"),
+             props([("v<sub>f</sub> at T<sub>1</sub>", w1["vf"], "ft³/lbm", "A-4E", 0.003, fF(T1)), ("h<sub>f</sub> at T<sub>1</sub>", w1["hf"], "Btu/lbm", "A-4E", 0.004, fF(T1)),
+                    ("h<sub>f</sub> at T<sub>2</sub>", w2["hf"], "Btu/lbm", "A-4E", 0.004, fF(T2)), ("s<sub>f</sub> at T<sub>1</sub>", w1["sf"], "Btu/lbm·R", "A-4E", 0.004, fF(T1)),
+                    ("s<sub>f</sub> at T<sub>2</sub>", w2["sf"], "Btu/lbm·R", "A-4E", 0.004, fF(T2))]),
+             calc([f"ṁ = V̇/v<sub>f</sub> = {Vd}/{w1['vf']} = <b>{sg(m)} lbm/s</b>",
+                   f"Q̇<sub>L,max</sub> = ṁ(h<sub>2</sub> − h<sub>1</sub>) = ({sg(m)})({num(w2['hf'], 2)} − {num(w1['hf'], 2)}) = <b>{sg(QL)} Btu/s</b>",
+                   f"Reversible plant: Q̇<sub>H</sub> = T<sub>H</sub>ṁ(s<sub>2</sub> − s<sub>1</sub>) = ({num(THR, 2)} R)({sg(m)})({w2['sf']} − {w1['sf']}) = {sg(QH)} Btu/s",
+                   f"Ẇ<sub>max</sub> = Q̇<sub>H</sub> − Q̇<sub>L</sub> = {sg(Wmax)} Btu/s × 1.055 kW per Btu/s = <b>{sg(WMW)} MW</b>",
+                   f"η = Ẇ/Q̇<sub>H</sub> = <b>{pct(eta):.1f}%</b>",
+                   f"Quick check: Carnot with T<sub>L</sub> = {fF(T1)} gives Ẇ = Q̇<sub>L</sub>(T<sub>H</sub>/T<sub>L</sub> − 1) = {sg(Wsimple)} MW, within about 1%"]),
+             mc(8, "Why is the quick Carnot estimate so close to the exact answer?",
+                [f"The river warms only {dT} °F, so its absolute temperature barely changes; treating it as a reservoir at {fF(T1)} is nearly right",
+                 "Because the plant is reversible", "Because the river is a liquid", "It's a coincidence"],
+                0, "The exact method uses the entropy balance because the sink's temperature changes. When that change is small next to the absolute temperature, the reservoir model works. "
+                   "Notice what actually limits the plant: the river's permit, not the fuel. Real plants make far less than this limit, which is why big thermal plants are sited on big rivers or the coast.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P3: turbine with velocities; heat loss from the first law
+@past("P3", "Turbine with fast steam and an unknown heat loss", 7, "B", 16, "challenge", "Old Exam 2s, turbine with velocities and entropy generated at T0")
+def P3(rng):
+    P1 = rng.choice([k for k in W.SH if 1000 <= k <= 5000]); T1 = rng.choice([t for t in W.SH[P1] if 300 <= t <= 500])
+    T2 = rng.choice([100, 110, 120, 130, 150]); V1 = rng.choice([120, 140, 160, 180]); V2 = rng.choice([60, 75, 90, 100]); T0 = rng.choice([300, 320, 350])
+    s1 = W.sh(P1, T1); st = W.satT(T2); P2 = st["P"]
+    dke = (V1 ** 2 - V2 ** 2) / 2000
+    x2s = (s1["s"] - st["sf"]) / st["sfg"]; assert 0.8 < x2s < 0.995
+    h2s = st["hf"] + x2s * st["hfg"]
+    qout = rng.choice([10, 15, 20, 25, 30, 40]); w = s1["h"] - st["hg"] + dke - qout; assert w > 150
+    w = round(w); qout = s1["h"] - st["hg"] + dke - w
+    sgen = st["sg"] - s1["s"] + qout / T0; assert sgen > 0.01
+    ws = s1["h"] - h2s + dke; eta = w / ws
+    stem = (f"Steam enters a turbine at {fP(P1)} and {fT(T1)} with a velocity of {V1} m/s. Saturated vapor at {fT(T2)} leaves with a velocity of {V2} m/s. The turbine produces {w} kJ/kg of work "
+            f"and loses heat to surroundings at {T0} K. Determine (a) the heat lost per kilogram of steam, (b) the entropy generated per kilogram, counting the surroundings, and "
+            "(c) the isentropic efficiency, comparing with an isentropic turbine between the same inlet state and exit pressure with the same velocities.")
+    parts = [part("a", "Heat lost, q<sub>out</sub>", "kJ/kg", qout, 0.03, 5,
+                  [(s1["h"] - st["hg"] - w, "Include the kinetic energy change: q<sub>out</sub> = (h<sub>1</sub> − h<sub>2</sub>) + (V<sub>1</sub>² − V<sub>2</sub>²)/2 − w."),
+                   (s1["h"] - st["hg"] + (V1 ** 2 - V2 ** 2) / 2 - w, "Divide V²/2 by 1000 to get kJ/kg.")]),
+             part("b", "Entropy generated, s<sub>gen</sub>", "kJ/kg·K", sgen, 0.02, 6,
+                  [(st["sg"] - s1["s"], "That's only the steam. The heat it loses raises the surroundings' entropy by q<sub>out</sub>/T<sub>0</sub>."), (st["sg"] - s1["s"] - qout / T0, "Heat leaving the turbine adds to the generation: + q<sub>out</sub>/T<sub>0</sub>.")]),
+             part("c", "Isentropic efficiency, η<sub>T</sub>", "%", pct(eta), 0.01, 5,
+                  [(pct((s1["h"] - st["hg"]) / (s1["h"] - h2s)), "Both works should include the same kinetic-energy change, and the actual work is given: η = w/w<sub>s</sub>."),
+                   (pct(w / (s1["h"] - h2s)), "The isentropic turbine has the same velocities, so add the KE change to its work too.")])]
+    steps = [self_step("Find the heat loss, the entropy generated and the isentropic efficiency of a steam turbine with fast-moving steam. Plan: the first law gives q<sub>out</sub> because w is given; the entropy balance with the boundary at T<sub>0</sub> gives s<sub>gen</sub>; s<sub>2s</sub> = s<sub>1</sub> gives the ideal exit."),
+             dia("Which T-s sketch shows the expansion?", ["ts_turb", "ts_turb_isoT", "ts_comp_dome", "ts_rcomp_dome"], 0,
+                 "Superheated inlet, expansion into the dome. The ideal exit 2s is straight below 1; the actual exit (saturated vapor) sits to the right on the same pressure line."),
+             assume([f"In: {fP(P1)}, {fT(T1)}, V<sub>1</sub> = {V1} m/s", f"Out: saturated vapor at {fT(T2)}, V<sub>2</sub> = {V2} m/s", f"w = {w} kJ/kg", f"T<sub>0</sub> = {T0} K"],
+                    ["q<sub>out</sub> (kJ/kg)", "s<sub>gen</sub> (kJ/kg·K)", "η<sub>T</sub> (%)"],
+                    [("open", True, "Steam flows through."), ("steady", True, "Steady operation."), ("nope", True, "Same height."),
+                     ("steam", True, "Rule 1: A-6 at the inlet, A-4 at the exit (saturated vapor at T<sub>2</sub>)."), ("surr", True, "So the heat crosses at T<sub>0</sub>."),
+                     ("isen", True, "For the comparison turbine only: s<sub>2s</sub> = s<sub>1</sub>."),
+                     ("lowke", False, "Both velocities are given and they aren't small."), ("adiabatic", False, "The turbine loses heat."), ("steamideal", False, "Rule 1: tables for steam.")]),
+             multi([(FIRST_SF + " (per kg)", True, ""), ("s<sub>gen</sub> = s<sub>2</sub> − s<sub>1</sub> + q<sub>out</sub>/T<sub>0</sub>", True, ""), ("x<sub>2s</sub> = (s<sub>1</sub> − s<sub>f</sub>)/s<sub>fg</sub>", True, ""),
+                    ("η<sub>T</sub> = w/w<sub>s</sub>", True, ""), ("s<sub>gen</sub> = s<sub>2</sub> − s<sub>1</sub>", False, "That ignores the entropy the lost heat carries into the surroundings.")], FIRST_SF),
+             sf_single({"Qin": (["dir"], "Heat leaves."), "Win": (["dir"], "Work comes out."), "mpe1": (["nope"], "Same height."), "mpe2": (["nope"], "Same height."), "dE": (["steady"], "Steady.")},
+                       "q<sub>out</sub> = (h<sub>1</sub> − h<sub>2</sub>) + (V<sub>1</sub>² − V<sub>2</sub>²)/2 − w<sub>out</sub>"),
+             props([("h<sub>1</sub>", s1["h"], "kJ/kg", "A-6", 0.003, f"{fP(P1)} block, {fT(T1)} row"), ("s<sub>1</sub>", s1["s"], "kJ/kg·K", "A-6", 0.003, f"{fP(P1)} block, {fT(T1)} row"),
+                    ("h<sub>2</sub> = h<sub>g</sub>", st["hg"], "kJ/kg", "A-4", 0.003, fT(T2)), ("s<sub>2</sub> = s<sub>g</sub>", st["sg"], "kJ/kg·K", "A-4", 0.003, fT(T2)),
+                    ("h<sub>f</sub> at T<sub>2</sub>", st["hf"], "kJ/kg", "A-4", 0.003, fT(T2)), ("h<sub>fg</sub> at T<sub>2</sub>", st["hfg"], "kJ/kg", "A-4", 0.003, fT(T2)),
+                    ("s<sub>f</sub> at T<sub>2</sub>", st["sf"], "kJ/kg·K", "A-4", 0.003, fT(T2)), ("s<sub>fg</sub> at T<sub>2</sub>", st["sfg"], "kJ/kg·K", "A-4", 0.003, fT(T2))]),
+             calc([f"Δke = (V<sub>1</sub>² − V<sub>2</sub>²)/2 = ({V1}² − {V2}²)/2000 = {sg(dke)} kJ/kg",
+                   f"q<sub>out</sub> = (h<sub>1</sub> − h<sub>2</sub>) + Δke − w = ({num(s1['h'], 1)} − {num(st['hg'], 1)}) + {sg(dke)} − {w} = <b>{sg(qout)} kJ/kg</b>",
+                   f"s<sub>gen</sub> = s<sub>2</sub> − s<sub>1</sub> + q<sub>out</sub>/T<sub>0</sub> = {num(st['sg'], 4)} − {num(s1['s'], 4)} + {sg(qout)}/{T0} = <b>{sg(sgen, 3)} kJ/kg·K</b>",
+                   f"Ideal exit at P<sub>2</sub> = {sg(P2)} kPa: x<sub>2s</sub> = ({num(s1['s'], 4)} − {num(st['sf'], 4)})/{num(st['sfg'], 4)} = {sg(x2s, 4)}; h<sub>2s</sub> = {sg(h2s, 5)} kJ/kg",
+                   f"w<sub>s</sub> = (h<sub>1</sub> − h<sub>2s</sub>) + Δke = {sg(ws)} kJ/kg; η<sub>T</sub> = {w}/{sg(ws)} = <b>{pct(eta):.1f}%</b>"]),
+             mc(8, "The steam's entropy rises and heat leaves. Which part of s<sub>gen</sub> is which?",
+                ["s<sub>2</sub> − s<sub>1</sub> is the steam's change; q<sub>out</sub>/T<sub>0</sub> is the entropy the lost heat delivers to the surroundings. Both are positive here, so both add to s<sub>gen</sub>",
+                 "q<sub>out</sub>/T<sub>0</sub> should be subtracted because heat leaves", "s<sub>gen</sub> should be zero for a steady device", "Only the steam counts"],
+                0, "In the entropy balance, heat leaving the boundary carries entropy out of the turbine, so it shows up on the generation side: s<sub>gen</sub> = (s<sub>out</sub> − s<sub>in</sub>) + q<sub>out</sub>/T<sub>0</sub>. A negative s<sub>gen</sub> would mean the data can't be right.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P4: vortex tube claim (US units)
+@past("P4", "Vortex tube claim: hot and cold air from one stream", 7, "E", 20, "hardest", "Old Exam 2, inventor's one-inlet, two-outlet air device", us=True)
+def P4(rng):
+    Tin = rng.choice([60, 70, 80]); Pin = rng.choice([1.03, 1.05, 1.08, 1.1, 1.2, 1.5, 2, 5.1]); y = rng.choice([0.5, 0.6, 0.7]); Tc = rng.choice([-40, -30, -20, -10, 0, 10, 20])
+    Th = (Tin - y * Tc) / (1 - y); assert Th - Tin > 40
+    TinR, TcR, ThR = Tin + R0, Tc + R0, Th + R0
+    sT = y * CPE * math.log(TcR / TinR) + (1 - y) * CPE * math.log(ThR / TinR)
+    sgen = sT + RE * math.log(Pin / 1.0); assert abs(sgen) > 0.0012
+    Pmin = math.exp(-sT / RE)
+    stem = (f"An inventor claims a device with no work and no heat transfer that splits one stream of air into a hot stream and a cold stream. Air enters at {fF(Tin)} and {Pin:g} atm. "
+            f"{int(round(y * 100))}% of it leaves at {fF(Tc)}, and the rest leaves hotter. Both exits are at 1 atm. Using constant specific heats, determine (a) the hot-stream temperature, "
+            "(b) the entropy generated per pound of entering air (a negative value means the claim is impossible), and (c) the lowest inlet pressure at which the claim could be possible.")
+    parts = [part("a", "Hot-stream temperature, T<sub>h</sub>", "°F", Th, 0.006, 5, [((Tin - (1 - y) * Tc) / y, "Swap the fractions: the cold stream carries y = {:.0%} of the mass.".format(y))]),
+             part("b", "Entropy generated, s<sub>gen</sub>", "Btu/lbm·R", sgen, 0.03, 9,
+                  [(sT, "Don't forget the pressure term: −R ln(P<sub>out</sub>/P<sub>in</sub>), which is positive because the pressure drops."),
+                   (y * CPE * math.log(Tc / Tin) + (1 - y) * CPE * math.log(Th / Tin) + RE * math.log(Pin) if Tc > 0 else None, "Use absolute temperatures (°F + 459.67)."),
+                   (sT - RE * math.log(Pin), "Sign: s<sub>2</sub> − s<sub>1</sub> = c<sub>p</sub> ln(T<sub>2</sub>/T<sub>1</sub>) − R ln(P<sub>2</sub>/P<sub>1</sub>), and P<sub>2</sub>/P<sub>1</sub> &lt; 1.")]),
+             part("c", "Lowest possible inlet pressure", "atm", Pmin, 0.01, 6, [(1 + (-sT / RE), "Solve R ln(P<sub>in</sub>/1 atm) = −(temperature terms): P<sub>in</sub> = exp(…), not 1 + (…).")])]
+    steps = [self_step("Test an inventor's claim for a device with one inlet and two exits: find the hot exit temperature, the entropy generated, and the lowest inlet pressure that could make it work. Plan: first law for T<sub>h</sub>, entropy balance per pound of inlet air, then set s<sub>gen</sub> = 0."),
+             mc(2, "Which balances apply to this device?",
+                ["Mass: ṁ<sub>1</sub> = ṁ<sub>c</sub> + ṁ<sub>h</sub>. Energy: ṁ<sub>1</sub>h<sub>1</sub> = ṁ<sub>c</sub>h<sub>c</sub> + ṁ<sub>h</sub>h<sub>h</sub>. Entropy: Ṡ<sub>gen</sub> = ṁ<sub>c</sub>s<sub>c</sub> + ṁ<sub>h</sub>s<sub>h</sub> − ṁ<sub>1</sub>s<sub>1</sub>",
+                 "Closed system: Q − W = ΔU", "Only the entropy balance; the first law is automatically satisfied", "Energy is not conserved because the streams separate"],
+                0, "One inlet, two exits, steady, no heat, no work. The first law fixes the hot temperature from the inventor's other data; the second law then judges the claim."),
+             assume([f"In: {fF(Tin)}, {Pin:g} atm", f"Cold: {int(round(y * 100))}% at {fF(Tc)}, 1 atm", "Hot: the rest, 1 atm"], ["T<sub>h</sub> (°F)", "s<sub>gen</sub> (Btu/lbm·R)", "P<sub>in,min</sub> (atm)"],
+                    [("open", True, "Air flows through."), ("steady", True, "Steady operation."), ("adiabatic", True, "Given: no heat transfer."), ("noshaft", True, "Given: no work."),
+                     ("lowke", True, "Small velocities at the measurement points."), ("nope", True, "Same height."), ("ideal", True, "Air near room temperature and a few atm: Z ≈ 1 (rule 2)."),
+                     ("constc_air", True, f"Rule 4: the largest change is about {int(round(max(Th - Tin, Tin - Tc), -1))} °F."),
+                     ("sconst", False, "That's what you're testing."), ("a17", False, "Small ΔT here (rule 4).")]),
+             multi([("T<sub>h</sub> = (T<sub>1</sub> − yT<sub>c</sub>)/(1 − y)", True, ""),
+                    ("s<sub>gen</sub> = y[c<sub>p</sub> ln(T<sub>c</sub>/T<sub>1</sub>) − R ln(P<sub>2</sub>/P<sub>1</sub>)] + (1 − y)[c<sub>p</sub> ln(T<sub>h</sub>/T<sub>1</sub>) − R ln(P<sub>2</sub>/P<sub>1</sub>)]", True, ""),
+                    ("Possible only if s<sub>gen</sub> ≥ 0", True, ""), (FIRST_SF, True, ""), ("Δs = c<sub>p</sub> ln(T<sub>2</sub>/T<sub>1</sub>)", False, "The pressure changes too.")], FIRST_SF),
+             multi_terms(["ṁ<sub>1</sub>h<sub>1</sub>"], ["ṁ<sub>c</sub>h<sub>c</sub>", "ṁ<sub>h</sub>h<sub>h</sub>"], "h<sub>1</sub> = yh<sub>c</sub> + (1 − y)h<sub>h</sub>, so T<sub>1</sub> = yT<sub>c</sub> + (1 − y)T<sub>h</sub>"),
+             props([("c<sub>p</sub> for air", CPE, "Btu/lbm·R", "A-2Ea", 0.004, "air"), ("R for air", RE, "Btu/lbm·R", "A-1E", 0.003, "air")]),
+             calc([f"T<sub>h</sub> = ({Tin} − {y}·({Tc}))/(1 − {y}) = <b>{num(Th, 1)} °F</b>",
+                   f"In rankine: T<sub>1</sub> = {num(TinR, 2)}, T<sub>c</sub> = {num(TcR, 2)}, T<sub>h</sub> = {num(ThR, 2)} R",
+                   f"Temperature terms: {y}(0.240) ln({num(TcR, 2)}/{num(TinR, 2)}) + {sg(1 - y)}(0.240) ln({num(ThR, 2)}/{num(TinR, 2)}) = {sg(sT, 4)} Btu/lbm·R",
+                   f"Pressure term: −R ln(1/{Pin:g}) = 0.06855 ln({Pin:g}) = {sg(RE * math.log(Pin), 4)} Btu/lbm·R",
+                   f"s<sub>gen</sub> = <b>{sg(sgen, 3)} Btu/lbm·R</b>: the claim is {'possible' if sgen > 0 else 'impossible'}",
+                   f"Set s<sub>gen</sub> = 0: ln P<sub>in</sub> = −({sg(sT, 4)})/0.06855, so P<sub>in,min</sub> = <b>{sg(Pmin)} atm</b>"]),
+             mc(8, "Separating air into hot and cold looks like it should violate the second law. Why can it be possible?",
+                ["The pressure drop pays for it: expanding from high to low pressure generates enough entropy to cover the ordering of temperatures, if the inlet pressure is high enough",
+                 "It can't; any such device is impossible", "Because energy is conserved", "Because the cold stream is larger"],
+                0, "This is a real device, the Ranque-Hilsch vortex tube, used for spot cooling in machine shops. It only works with compressed air, and part (c) shows why: below the minimum pressure, the claim breaks the second law.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P5: two compartments of air mix (A-17)
+@past("P5", "Two compartments of air mix", 7, "E", 20, "challenge", "Old Exam 2, rigid insulated tank with a ruptured membrane")
+def P5(rng):
+    mA = rng.choice([0.5, 1.0, 1.5, 2.0]); TA = rng.choice([300, 320, 350, 400]); PA = rng.choice([100, 150, 200, 300])
+    mB = rng.choice([0.5, 1.0, 1.5]); TB = rng.choice([500, 600, 700, 800]); PB = rng.choice([200, 300, 400, 600])
+    rA, rB = a17.row(TA), a17.row(TB); uf = (mA * rA["u"] + mB * rB["u"]) / (mA + mB)
+    sf, (a, b), fr = a17.by("u", uf); Tf = sf["T"]
+    VA, VB = mA * RA * TA / PA, mB * RA * TB / PB; Pf = (mA + mB) * RA * Tf / (VA + VB)
+    dSA = mA * (sf["s"] - rA["s"] - RA * math.log(Pf / PA)); dSB = mB * (sf["s"] - rB["s"] - RA * math.log(Pf / PB)); Sg = dSA + dSB
+    Tavg = (mA * TA + mB * TB) / (mA + mB)
+    stem = (f"A rigid, insulated tank is split by a membrane. One side holds {mA} kg of air at {TA} K and {PA} kPa; the other holds {mB} kg of air at {TB} K and {PB} kPa. "
+            "The membrane breaks and the air mixes to a uniform state. Using variable specific heats, determine (a) the final temperature, (b) the final pressure, and (c) the total entropy generated.")
+    parts = [part("a", "Final temperature, T<sub>f</sub>", "K", Tf, 0.004, 6, [(Tavg, "That mass-averages T, which assumes constant c<sub>v</sub>. With A-17, mass-average u, then read T.")]),
+             part("b", "Final pressure, P<sub>f</sub>", "kPa", Pf, 0.008, 6, [((mA * PA + mB * PB) / (mA + mB), "Pressures don't average. Find each volume from PV = mRT, add them, then P<sub>f</sub> = m<sub>tot</sub>RT<sub>f</sub>/V<sub>tot</sub>."),
+                                                                         ((PA + PB) / 2, "Pressures don't average. Use the total volume and the ideal-gas law.")]),
+             part("c", "Total entropy generated, S<sub>gen</sub>", "kJ/K", Sg, 0.03, 8, [(mA * (sf["s"] - rA["s"]) + mB * (sf["s"] - rB["s"]), "Each side's pressure changes too: include −R ln(P<sub>f</sub>/P<sub>i</sub>) for each."),
+                                                                                    (abs(dSA) + abs(dSB), "Add the two changes with their signs.")])]
+    steps = [self_step("Find the final temperature, pressure and entropy generated when two masses of air mix inside a rigid, insulated tank. Plan: closed-system first law for T<sub>f</sub>; ideal-gas law on the total volume for P<sub>f</sub>; Δs for each side, added."),
+             mc(2, "Which system makes this simplest?",
+                ["All the air in the tank: rigid and insulated, so Q = 0 and W = 0, and ΔU = 0", "The hot side only, with Q = 0", "The membrane", "An open system with two inlets"],
+                0, "With the whole tank as the system, nothing crosses the boundary, so U<sub>final</sub> = U<sub>A</sub> + U<sub>B</sub>. Choose one side alone and it exchanges energy with the other."),
+             assume([f"A: {mA} kg, {TA} K, {PA} kPa", f"B: {mB} kg, {TB} K, {PB} kPa"], ["T<sub>f</sub> (K)", "P<sub>f</sub> (kPa)", "S<sub>gen</sub> (kJ/K)"],
+                    [("closed", True, "No mass crosses the tank wall."), ("rigid", True, "Given."), ("adiabatic", True, "Insulated."), ("stationary", True, "The tank doesn't move."),
+                     ("ideal", True, "Air at a few hundred kPa and 300+ K: Z ≈ 1 (rule 2)."), ("a17", True, f"Rule 4: the sides change by up to {int(round(max(abs(Tf - TA), abs(TB - Tf)), -1))} K."),
+                     ("same", True, "Both sides are air."), ("noshaft", True, "No work crosses the boundary.", "No work crosses the boundary: no shaft, no wires, and the walls don't move."),
+                     ("tavg", False, "Only with constant c<sub>v</sub>, and pressures never average."), ("constc_big", False, "Large ΔT (rule 4).")]),
+             multi([("U<sub>f</sub> = U<sub>A</sub> + U<sub>B</sub>: u<sub>f</sub> = (m<sub>A</sub>u<sub>A</sub> + m<sub>B</sub>u<sub>B</sub>)/(m<sub>A</sub> + m<sub>B</sub>)", True, ""),
+                    ("V = mRT/P for each side; P<sub>f</sub> = m<sub>tot</sub>RT<sub>f</sub>/(V<sub>A</sub> + V<sub>B</sub>)", True, ""),
+                    ("ΔS<sub>i</sub> = m<sub>i</sub>[s°(T<sub>f</sub>) − s°(T<sub>i</sub>) − R ln(P<sub>f</sub>/P<sub>i</sub>)]", True, ""), (SGEN_CL, True, ""),
+                    ("P<sub>f</sub> = (P<sub>A</sub> + P<sub>B</sub>)/2", False, "Pressures don't average.")], FIRST_CL),
+             strike_closed({"Qin": (["adiabatic"], "Insulated."), "Qout": (["adiabatic"], "Insulated."), "Win": (["rigid"], "Rigid, no shaft."), "Wout": (["rigid"], "Rigid, no shaft."),
+                            "dKE": (["stationary"], "Doesn't move."), "dPE": (["stationary"], "Doesn't move.")}, "0 = ΔU = (m<sub>A</sub> + m<sub>B</sub>)u<sub>f</sub> − m<sub>A</sub>u<sub>A</sub> − m<sub>B</sub>u<sub>B</sub>"),
+             props([("u<sub>A</sub>", rA["u"], "kJ/kg", "A-17", 0.003, f"{TA} K"), ("s°<sub>A</sub>", rA["s"], "kJ/kg·K", "A-17", 0.003, f"{TA} K"),
+                    ("u<sub>B</sub>", rB["u"], "kJ/kg", "A-17", 0.003, f"{TB} K"), ("s°<sub>B</sub>", rB["s"], "kJ/kg·K", "A-17", 0.003, f"{TB} K"), ("R for air", RA, "kJ/kg·K", "A-1", 0.003, "air")]),
+             calc([f"u<sub>f</sub> = ({mA}·{num(rA['u'], 2)} + {mB}·{num(rB['u'], 2)})/{mA + mB:g} = {sg(uf, 5)} kJ/kg: {a17where(a, b, fr)}; T<sub>f</sub> = <b>{sg(Tf)} K</b>, s°<sub>f</sub> = {sg(sf['s'], 5)}",
+                   f"V<sub>A</sub> = ({mA})(0.287)({TA})/{PA} = {sg(VA)} m³; V<sub>B</sub> = ({mB})(0.287)({TB})/{PB} = {sg(VB)} m³",
+                   f"P<sub>f</sub> = ({mA + mB:g})(0.287)({sg(Tf)})/{sg(VA + VB)} = <b>{sg(Pf)} kPa</b>",
+                   f"ΔS<sub>A</sub> = {mA}[{sg(sf['s'], 5)} − {num(rA['s'], 5)} − 0.287 ln({sg(Pf)}/{PA})] = {sg(dSA, 4)} kJ/K",
+                   f"ΔS<sub>B</sub> = {mB}[{sg(sf['s'], 5)} − {num(rB['s'], 5)} − 0.287 ln({sg(Pf)}/{PB})] = {sg(dSB, 4)} kJ/K",
+                   f"Isolated system: S<sub>gen</sub> = ΔS<sub>A</sub> + ΔS<sub>B</sub> = <b>{sg(Sg, 3)} kJ/K</b>"]),
+             mc(8, "Both compartments hold air. Why is there no extra \"mixing\" entropy term, like there would be for air mixing with helium?",
+                ["The molecules are identical, so ending up mixed isn't a new kind of disorder; only the temperature and pressure changes count",
+                 "Because the tank is insulated", "There is one, but it's too small to matter", "Because pressure doesn't affect entropy"],
+                0, "Mixing two different gases generates entropy even at equal T and P. Mixing a gas with more of itself doesn't. Here all the generation comes from heat flowing between the hot and cold air and from the pressures equalizing.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P6: polytropic compression with heat loss (A-17)
+@past("P6", "Polytropic compression that loses heat", 7, "E", 20, "challenge", "Old Exam 2, polytropic compression of air in a piston-cylinder")
+def P6(rng):
+    P1 = rng.choice([100, 120]); T1 = rng.choice([290, 300]); V1 = rng.choice([0.2, 0.4, 0.6, 0.8]); P2 = rng.choice([600, 800, 900, 1000]); n = rng.choice([1.2, 1.25, 1.27, 1.3])
+    m = P1 * V1 / (RA * T1); T2 = T1 * (P2 / P1) ** ((n - 1) / n)
+    r1 = a17.row(T1); s2, (a, b), fr = a17.by("T", T2)
+    Win = m * RA * (T2 - T1) / (n - 1); dU = m * (s2["u"] - r1["u"]); Qout = Win - dU
+    dS = m * (s2["s"] - r1["s"] - RA * math.log(P2 / P1)); Sg = dS + Qout / T1; assert Qout > 0 and Sg > 0
+    stem = (f"Air in a piston-cylinder device starts at {P1} kPa, {T1} K and {V1} m³. It is compressed to {P2} kPa following PV<sup>n</sup> = constant with n = {n}, "
+            f"losing heat to the surroundings at {T1} K. Using variable specific heats for u and s, determine (a) the final temperature, (b) the boundary work done on the air, "
+            "(c) the heat lost, and (d) the total entropy generated, counting the surroundings.")
+    parts = [part("a", "Final temperature, T<sub>2</sub>", "K", T2, 0.005, 4, [(T1 * (P2 / P1) ** 0.4 / 1.4 * 1.4 if False else T1 * (P2 / P1) ** (0.4 / 1.4), "That's the isentropic result (k). Use the polytropic exponent: (n − 1)/n."),
+                                                                     (T1 * (P2 / P1) ** (n - 1), "For pressure ratios the exponent is (n − 1)/n.")]),
+             part("b", "Boundary work in, W<sub>b,in</sub>", "kJ", Win, 0.01, 5, [(m * RA * (T2 - T1) / (1.4 - 1), "Use n, not k, in W = mR(T<sub>2</sub> − T<sub>1</sub>)/(n − 1)."), (Win / m, "That's per kilogram; multiply by m.")]),
+             part("c", "Heat lost, Q<sub>out</sub>", "kJ", Qout, 0.015, 5, [(dU, "That's ΔU. The first law: Q<sub>out</sub> = W<sub>in</sub> − ΔU."), (Win + dU, "Sign: W<sub>in</sub> − Q<sub>out</sub> = ΔU.")]),
+             part("d", "Total entropy generated, S<sub>gen</sub>", "kJ/K", Sg, 0.03, 6, [(dS, "That's only the air. Add the surroundings' gain, Q<sub>out</sub>/T<sub>0</sub>."), (Qout / T1, "Add the air's own (negative) entropy change.")])]
+    steps = [self_step("Find the final temperature, work, heat loss and entropy generated for a polytropic compression of air. Plan: polytropic relation for T<sub>2</sub>, the polytropic work formula, the first law for Q, then an entropy balance with the surroundings at T<sub>0</sub>."),
+             mc(2, "On a P-v diagram, where does the polytropic curve (n = 1.25-ish) sit?",
+                ["Between the isothermal curve (n = 1) and the isentropic curve (n = k = 1.4): steeper than isothermal, shallower than isentropic",
+                 "Steeper than the isentropic curve", "Flatter than the isothermal curve", "It's a straight line"],
+                0, "A smaller n means the gas stays cooler during compression because heat leaves. That's why the work is less than for an adiabatic compression to the same pressure, and why Q<sub>out</sub> is positive."),
+             assume([f"P<sub>1</sub> = {P1} kPa, T<sub>1</sub> = {T1} K, V<sub>1</sub> = {V1} m³", f"P<sub>2</sub> = {P2} kPa, n = {n}", f"Surroundings: {T1} K"], ["T<sub>2</sub> (K)", "W<sub>b,in</sub> (kJ)", "Q<sub>out</sub> (kJ)", "S<sub>gen</sub> (kJ/K)"],
+                    [("closed", True, "No mass crosses the boundary."), ("poly", True, "Given."), ("stationary", True, "The device doesn't move."), ("ideal", True, "Air: Z ≈ 1 (rule 2)."),
+                     ("a17", True, f"Rule 4: the air warms by about {int(round(T2 - T1, -1))} K, and the problem asks for variable specific heats."),
+                     ("reservoir", True, "The surroundings stay at T<sub>0</sub>.", "The surroundings act as a reservoir at T<sub>0</sub> = T<sub>1</sub>."),
+                     ("isen", False, "Isentropic would mean n = k and no heat loss."), ("adiabatic", False, "Heat leaves."), ("constv", False, "The piston moves.")]),
+             multi([("T<sub>2</sub> = T<sub>1</sub>(P<sub>2</sub>/P<sub>1</sub>)<sup>(n−1)/n</sup>", True, ""), ("W<sub>b,in</sub> = mR(T<sub>2</sub> − T<sub>1</sub>)/(n − 1)", True, ""), (FIRST_CL, True, ""),
+                    ("ΔS = m[s°<sub>2</sub> − s°<sub>1</sub> − R ln(P<sub>2</sub>/P<sub>1</sub>)]; S<sub>gen</sub> = ΔS + Q<sub>out</sub>/T<sub>0</sub>", True, ""),
+                    ("W = P(V<sub>2</sub> − V<sub>1</sub>)", False, "Pressure isn't constant.")], FIRST_CL),
+             strike_closed({"Qin": (["dir"], "Heat leaves."), "Wout": (["dir"], "Work goes in during compression."), "dKE": (["stationary"], "Doesn't move."), "dPE": (["stationary"], "Doesn't move.")},
+                           "W<sub>b,in</sub> − Q<sub>out</sub> = m(u<sub>2</sub> − u<sub>1</sub>)"),
+             props([("u<sub>1</sub>", r1["u"], "kJ/kg", "A-17", 0.003, f"{T1} K"), ("s°<sub>1</sub>", r1["s"], "kJ/kg·K", "A-17", 0.003, f"{T1} K"), ("R for air", RA, "kJ/kg·K", "A-1", 0.003, "air")]),
+             calc([f"m = P<sub>1</sub>V<sub>1</sub>/(RT<sub>1</sub>) = ({P1})({V1})/((0.287)({T1})) = {sg(m)} kg",
+                   f"T<sub>2</sub> = {T1}({P2}/{P1})<sup>({n} − 1)/{n}</sup> = <b>{sg(T2)} K</b>: {a17where(a, b, fr)}; u<sub>2</sub> = {sg(s2['u'], 5)} kJ/kg, s°<sub>2</sub> = {sg(s2['s'], 5)}",
+                   f"W<sub>b,in</sub> = mR(T<sub>2</sub> − T<sub>1</sub>)/(n − 1) = ({sg(m)})(0.287)({sg(T2)} − {T1})/{sg(n - 1)} = <b>{sg(Win)} kJ</b>",
+                   f"ΔU = m(u<sub>2</sub> − u<sub>1</sub>) = {sg(dU)} kJ; Q<sub>out</sub> = W<sub>b,in</sub> − ΔU = <b>{sg(Qout)} kJ</b>",
+                   f"ΔS<sub>air</sub> = ({sg(m)})[{sg(s2['s'], 5)} − {num(r1['s'], 5)} − 0.287 ln({P2}/{P1})] = {sg(dS, 4)} kJ/K",
+                   f"S<sub>gen</sub> = ΔS<sub>air</sub> + Q<sub>out</sub>/T<sub>0</sub> = {sg(dS, 4)} + {sg(Qout)}/{T1} = <b>{sg(Sg, 3)} kJ/K</b>"]),
+             mc(8, "The polytropic process is internally reversible. Where does S<sub>gen</sub> come from?",
+                ["Heat leaving the warm air and entering cooler surroundings across a temperature difference", "Friction in the piston", "It shouldn't exist; S<sub>gen</sub> should be zero", "The pressure rise"],
+                0, "Inside the air the process is reversible, so the air's entropy balance has no generation term. The generation happens in the thin region where heat crosses from air at T<sub>2</sub>-ish down to the surroundings at T<sub>1</sub>.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P7: two-stage compression with intercooling (steady flow, polytropic)
+@past("P7", "Two-stage compression with intercooling", 7, "E", 20, "challenge", "Old Final, two polytropic stages with perfect intercooling")
+def P7(rng):
+    T1 = rng.choice([290, 300, 310]); P1 = 100; r = rng.choice([9, 12, 16, 20, 25]); n = rng.choice([1.25, 1.3, 1.32, 1.35])
+    Px = P1 * math.sqrt(r); e = (n - 1) / n
+    w1st = n * RA * T1 / (n - 1) * ((Px / P1) ** e - 1); w2 = 2 * w1st
+    wsingle = n * RA * T1 / (n - 1) * (r ** e - 1); save = 1 - w2 / wsingle
+    Tx = T1 * (Px / P1) ** e; qic = CPA * (Tx - T1)
+    stem = (f"Air at {P1} kPa and {T1} K is compressed steadily to {P1 * r} kPa in two stages. Each stage is polytropic with n = {n}, the two stages have the same pressure ratio, "
+            "and an intercooler between them returns the air to the inlet temperature. Determine (a) the intercooler pressure, (b) the total compressor work per kilogram, "
+            "(c) the percentage of work saved compared with one polytropic stage with the same n, and (d) the heat removed in the intercooler per kilogram.")
+    parts = [part("a", "Intercooler pressure, P<sub>x</sub>", "kPa", Px, 0.005, 4, [(P1 * r / 2, "Equal pressure ratios mean P<sub>x</sub> = √(P<sub>1</sub>P<sub>2</sub>), not the average.")]),
+             part("b", "Total work, w<sub>in</sub>", "kJ/kg", w2, 0.01, 6, [(w1st, "That's one stage. Two equal stages with perfect intercooling do the same work each."),
+                                                                        (2 * RA * T1 / (n - 1) * ((Px / P1) ** e - 1), "Steady-flow polytropic work has a factor of n: w = nRT<sub>1</sub>/(n − 1)[(P<sub>x</sub>/P<sub>1</sub>)<sup>(n−1)/n</sup> − 1]."),
+                                                                        (wsingle, "That's the single-stage work.")]),
+             part("c", "Work saved", "%", pct(save), 0.02, 5, []),
+             part("d", "Intercooler heat, q<sub>out</sub>", "kJ/kg", qic, 0.01, 5, [(CVA * (Tx - T1), "Flowing air at constant pressure: q = c<sub>p</sub>ΔT.")])]
+    steps = [self_step("Find the intercooler pressure, the total work, the savings over one stage, and the intercooler's heat for two-stage compression. Plan: equal ratios give P<sub>x</sub>; the reversible steady-flow work ∫v dP for a polytropic process gives each stage's work."),
+             mc(2, "On a P-v diagram, what do the two stages and the intercooler look like?",
+                ["Polytropic curve 1→x, then a horizontal step left (cooling at constant P back to the T<sub>1</sub> isotherm), then a second polytropic curve to P<sub>2</sub>; the area saved sits between the one-stage curve and the two-stage path",
+                 "One straight line", "Two vertical lines", "The intercooler raises the pressure"],
+                0, "Steady-flow work is the area to the left of the path on P-v (∫v dP). Cooling between stages shrinks v, which shrinks that area. That's why intercooling saves work."),
+             assume([f"P<sub>1</sub> = {P1} kPa, T<sub>1</sub> = {T1} K", f"P<sub>2</sub> = {P1 * r} kPa", f"n = {n}"], ["P<sub>x</sub> (kPa)", "w<sub>in</sub> (kJ/kg)", "Savings (%)", "q<sub>IC</sub> (kJ/kg)"],
+                    [("open", True, "Air flows through."), ("steady", True, "Steady operation."), ("poly", True, "Given.", "Each stage follows Pv<sup>n</sup> = constant, reversibly."), ("pic", True, "Given."),
+                     ("equalr", True, "Given."), ("ideal", True, "Air: Z ≈ 1 (rule 2)."), ("lowke", True, "Small KE changes."), ("nope", True, "Same height."),
+                     ("constc_air", True, "Only the intercooler's heat uses c<sub>p</sub>; the polytropic work formula needs no table.", "Constant c<sub>p</sub> for the intercooler (A-2a); the work formula uses only R and n."),
+                     ("isen", False, "n is given, not k.")]),
+             multi([("P<sub>x</sub> = √(P<sub>1</sub>P<sub>2</sub>)", True, ""), ("w<sub>stage</sub> = nRT<sub>1</sub>/(n − 1)[(P<sub>x</sub>/P<sub>1</sub>)<sup>(n−1)/n</sup> − 1]", True, ""),
+                    ("T<sub>x</sub> = T<sub>1</sub>(P<sub>x</sub>/P<sub>1</sub>)<sup>(n−1)/n</sup>; q<sub>IC</sub> = c<sub>p</sub>(T<sub>x</sub> − T<sub>1</sub>)", True, ""),
+                    ("w = R(T<sub>2</sub> − T<sub>1</sub>)/(n − 1)", False, "That's closed-system boundary work. Steady flow has the extra factor n.")], FIRST_SF),
+             sf_single({"Qin": (["dir"], "The intercooler removes heat."), "Win": (["pic"], "The intercooler has no shaft."), "Wout": (["pic"], "No shaft."),
+                        "mke1": (["lowke"], "Small KE."), "mke2": (["lowke"], "Small KE."), "mpe1": (["nope"], "Same height."), "mpe2": (["nope"], "Same height."), "dE": (["steady"], "Steady.")},
+                       "Intercooler: q<sub>out</sub> = h<sub>x</sub> − h<sub>1</sub> = c<sub>p</sub>(T<sub>x</sub> − T<sub>1</sub>)", p="Apply the steady-flow first law to the intercooler. Cross out every term that drops."),
+             props([("R for air", RA, "kJ/kg·K", "A-1", 0.003, "air"), ("c<sub>p</sub> for air", CPA, "kJ/kg·K", "A-2a", 0.003, "300 K")]),
+             calc([f"P<sub>x</sub> = √({P1}·{P1 * r}) = <b>{sg(Px)} kPa</b> (ratio per stage {sg(Px / P1, 4)})",
+                   f"w<sub>stage</sub> = ({n})(0.287)({T1})/{sg(n - 1)} × [{sg(Px / P1, 4)}<sup>{sg(e, 4)}</sup> − 1] = {sg(w1st)} kJ/kg",
+                   f"w<sub>in</sub> = 2 × {sg(w1st)} = <b>{sg(w2)} kJ/kg</b>",
+                   f"One stage: w = ({n})(0.287)({T1})/{sg(n - 1)} × [{r}<sup>{sg(e, 4)}</sup> − 1] = {sg(wsingle)} kJ/kg; savings = 1 − {sg(w2)}/{sg(wsingle)} = <b>{pct(save):.1f}%</b>",
+                   f"T<sub>x</sub> = {T1}({sg(Px / P1, 4)})<sup>{sg(e, 4)}</sup> = {sg(Tx)} K; q<sub>IC</sub> = 1.005({sg(Tx)} − {T1}) = <b>{sg(qic)} kJ/kg</b>"]),
+             mc(8, "Why does the work saved grow as the overall pressure ratio grows?",
+                ["The higher the ratio, the hotter the air gets in one stage, so cooling halfway removes more volume and more work",
+                 "It doesn't change", "Because n changes", "Because the intercooler adds energy"],
+                0, "Every gas turbine and big air compressor with a high pressure ratio uses intercooling for this reason. The cost is a heat exchanger and the cooling water to run it.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P8: paddle wheel in a rigid insulated steam tank
+@past("P8", "Paddle wheel stirs steam in a rigid tank", 7, "E", 20, "challenge", "Old Exam 2 remake, paddle-wheel work on steam in a rigid, insulated tank")
+def P8(rng):
+    P1 = rng.choice([200, 300, 400, 600]); T1 = rng.choice([t for t in W.SH[P1] if 200 <= t <= 400]); P2 = rng.choice([k for k in W.SH if P1 * 1.3 <= k <= P1 * 2.5])
+    m = rng.choice([1.0, 1.5, 2.0, 3.0, 5.0]); s1 = W.sh(P1, T1)
+    s2, a, b = w_interp(P2, "v", s1["v"]); assert not a.get("sat")
+    Wpw = m * (s2["u"] - s1["u"]); Sg = m * (s2["s"] - s1["s"])
+    stem = (f"A rigid, insulated tank holds {m} kg of steam at {fP(P1)} and {fT(T1)}. A paddle wheel, turned by an outside motor, stirs the steam until the pressure reaches {fP(P2)}. "
+            "Determine (a) the final temperature, (b) the paddle-wheel work, and (c) the entropy generated.")
+    parts = [part("a", "Final temperature, T<sub>2</sub>", "°C", s2["T"], 0.008, 5, [(T1 * P2 / P1, "Steam isn't an ideal gas, and °C ratios mean nothing. Find v<sub>1</sub>, then look up the state with v<sub>2</sub> = v<sub>1</sub> at P<sub>2</sub>."),
+                                                                            ((T1 + T0K) * P2 / P1 - T0K, "Steam isn't an ideal gas here. Use v<sub>2</sub> = v<sub>1</sub> in the A-6 block at P<sub>2</sub>.")]),
+             part("b", "Paddle-wheel work, W<sub>pw,in</sub>", "kJ", Wpw, 0.015, 7, [(m * (s2["h"] - s1["h"]), "Rigid tank: ΔU, not ΔH. The steam does no flow work.")]),
+             part("c", "Entropy generated, S<sub>gen</sub>", "kJ/K", Sg, 0.02, 8, [(0.0, "Insulated isn't reversible. Stirring turns work into internal energy irreversibly: S<sub>gen</sub> = m(s<sub>2</sub> − s<sub>1</sub>)."),
+                                                                                 (Wpw / (T1 + T0K), "There's no heat transfer, so no Q/T term. S<sub>gen</sub> = ΔS of the steam.")])]
+    steps = [self_step("Find the final temperature, the paddle-wheel work and the entropy generated when a paddle wheel stirs steam in a rigid, insulated tank. Plan: v is fixed, so state 2 is P<sub>2</sub> with v<sub>2</sub> = v<sub>1</sub>; the first law gives the work; the entropy balance has no heat term."),
+             mc(2, "On a P-v diagram relative to the dome, which path does the steam follow?",
+                ["Straight up at constant v, staying in the superheated region", "Horizontal at constant P", "Down into the dome", "Along the saturated-vapor line"],
+                0, "Rigid tank: v can't change. The paddle wheel adds energy, so P and T rise along a vertical line, away from the dome."),
+             assume([f"m = {m} kg", f"State 1: {fP(P1)}, {fT(T1)}", f"P<sub>2</sub> = {fP(P2)}"], ["T<sub>2</sub> (°C)", "W<sub>pw,in</sub> (kJ)", "S<sub>gen</sub> (kJ/K)"],
+                    [("closed", True, "No mass crosses the boundary."), ("rigid", True, "Given."), ("adiabatic", True, "Given: insulated."), ("stationary", True, "The tank doesn't move."),
+                     ("steam", True, "Rule 1: A-6 at both states."),
+                     ("sconst", False, "Stirring is irreversible: work becomes internal energy and never comes back by itself."), ("steamideal", False, "Rule 1: tables for steam.")]),
+             multi([("v<sub>2</sub> = v<sub>1</sub>", True, ""), (FIRST_CL, True, ""), (SGEN_CL, True, ""), ("W<sub>b</sub> = P(V<sub>2</sub> − V<sub>1</sub>)", False, "Rigid: no boundary work. The work here is shaft work.")], FIRST_CL),
+             strike_closed({"Qin": (["adiabatic"], "Insulated."), "Qout": (["adiabatic"], "Insulated."), "Wout": (["dir"], "Work goes in."), "dKE": (["stationary"], "Doesn't move."), "dPE": (["stationary"], "Doesn't move.")},
+                           "W<sub>pw,in</sub> = m(u<sub>2</sub> − u<sub>1</sub>)"),
+             props([("v<sub>1</sub>", s1["v"], "m³/kg", "A-6", 0.003, f"{fP(P1)} block, {fT(T1)} row"), ("u<sub>1</sub>", s1["u"], "kJ/kg", "A-6", 0.003, f"{fP(P1)} block, {fT(T1)} row"),
+                    ("s<sub>1</sub>", s1["s"], "kJ/kg·K", "A-6", 0.003, f"{fP(P1)} block, {fT(T1)} row"),
+                    ("u<sub>2</sub> (v = v<sub>1</sub>)", s2["u"], "kJ/kg", "A-6", 0.004, f"{fP(P2)} block, " + between(a, b, "v", s1["v"], 4)),
+                    ("s<sub>2</sub> (v = v<sub>1</sub>)", s2["s"], "kJ/kg·K", "A-6", 0.004, f"{fP(P2)} block, same interpolation")]),
+             calc([f"v<sub>2</sub> = v<sub>1</sub> = {num(s1['v'], 5)} m³/kg; in the {fP(P2)} block this falls between the {fT(a['T'])} and {fT(b['T'])} rows",
+                   f"Interpolating: T<sub>2</sub> = <b>{num(s2['T'], 1)} °C</b>, u<sub>2</sub> = {sg(s2['u'], 5)} kJ/kg, s<sub>2</sub> = {sg(s2['s'], 5)} kJ/kg·K",
+                   f"W<sub>pw,in</sub> = m(u<sub>2</sub> − u<sub>1</sub>) = ({m})({sg(s2['u'], 5)} − {num(s1['u'], 1)}) = <b>{sg(Wpw)} kJ</b>",
+                   f"S<sub>gen</sub> = m(s<sub>2</sub> − s<sub>1</sub>) = ({m})({sg(s2['s'], 5)} − {num(s1['s'], 4)}) = <b>{sg(Sg, 3)} kJ/K</b>"]),
+             mc(8, "Could you get the paddle-wheel work back by letting the steam turn the paddle wheel in reverse?",
+                ["No: S<sub>gen</sub> &gt; 0 means the process can't run backward. The energy is still there as u, but it's lower-quality energy now",
+                 "Yes, all of it", "Yes, if the tank is insulated", "Only half of it"],
+                0, "Stirring is the textbook irreversible process: work in, internal energy up, entropy up, no heat. The first law says the energy is conserved; the second law says its usefulness isn't.")]
+    return stem, parts, steps, None, prm(locals())
+
+# ------------------------------------------------------------------ P9: heat pump minimum outdoor temperature
+@past("P9", "How cold can it get before the heat pump falls behind?", 6, "D", 14, "hardest", "Old Final, minimum outdoor temperature for a heat pump in an Everett house")
+def P9(rng):
+    k = rng.choice([500, 600, 730, 800, 900, 1000]); Wmax = rng.choice([2.0, 3.0, 4.5, 6.0]); Tin = rng.choice([20, 21, 22]); f = rng.choice([0.35, 0.40, 0.45, 0.50])
+    kk = k / 3600; TH = Tin + T0K
+    dTrev = math.sqrt(Wmax * TH / kk); dTreal = math.sqrt(f * Wmax * TH / kk)
+    Trev, Treal = Tin - dTrev, Tin - dTreal
+    Tcold = math.floor(Treal) - rng.choice([4, 6, 8, 10]); assert Tcold > -40
+    COPc = f * TH / (Tin - Tcold); need = kk * (Tin - Tcold); back = need - COPc * Wmax; assert back > 0.2
+    stem = (f"A well-insulated house in Everett loses {k} kJ/h for every °C between the inside and outside temperatures. Its heat pump draws at most {Wmax} kW and keeps the house at {fT(Tin)}. "
+            f"The real heat pump's COP is {int(round(f * 100))}% of the Carnot COP at any outdoor temperature. Determine (a) the lowest outdoor temperature at which a reversible heat pump with this power could keep up, "
+            f"(b) the same for the real heat pump, and (c) the backup resistance heat needed on a {fT(Tcold)} night. For (a) and (b), enter the largest inside-to-outside temperature difference.")
+    parts = [part("a", "Largest ΔT = T<sub>in</sub> − T<sub>out</sub>, reversible", "°C", dTrev, 0.01, 5, [(Wmax * TH / kk / 100, "")] if False else [(dTrev * dTrev / TH, "Solve kΔT = Ẇ·T<sub>H</sub>/ΔT for ΔT: ΔT = √(Ẇ·T<sub>H</sub>/k).")]),
+             part("b", "Largest ΔT, real heat pump", "°C", dTreal, 0.01, 5, [(f * dTrev, "COP scales by the fraction, so ΔT² scales by it: ΔT = √(f·Ẇ·T<sub>H</sub>/k), not f·ΔT<sub>rev</sub>."),
+                                                                          (math.sqrt(f * Wmax * Tin / kk), "Carnot needs T<sub>H</sub> in kelvins.")]),
+             part("c", "Backup heat needed", "kW", back, 0.02, 4, [(need, "That's the whole heat loss. The heat pump still supplies COP × Ẇ<sub>max</sub>; the backup covers the rest."),
+                                                                     (need - (TH / (Tin - Tcold)) * Wmax, "Use the real COP, f × Carnot, not Carnot.")])]
+    steps = [self_step("Find the coldest outdoor temperature at which a heat pump of fixed power can still heat a leaky house, first for a reversible machine and then for a real one, and the backup heat on a colder night. Plan: set the heat pump's output equal to the house's loss and solve for ΔT."),
+             mc(2, "Sketch heat loss and heat-pump output against outdoor temperature. Where is the answer?",
+                ["Where the rising heat-loss line (it grows as it gets colder) crosses the falling heat-pump output (COP drops as it gets colder)",
+                 "Where the heat loss is zero", "At the coldest temperature in the climate data", "Where COP = 1"],
+                0, "Both curves depend on ΔT = T<sub>in</sub> − T<sub>out</sub>. The heat pump's maximum output falls as the outside gets colder because the COP falls."),
+             assume([f"Loss: {k} kJ/h·°C", f"Ẇ<sub>max</sub> = {Wmax} kW", f"T<sub>in</sub> = {fT(Tin)}", f"COP = {f} × COP<sub>Carnot</sub>", f"Cold night: {fT(Tcold)}"],
+                    ["ΔT<sub>max</sub> reversible (°C)", "ΔT<sub>max</sub> real (°C)", "Backup (kW)"],
+                    [("loss", True, "Given."), ("frac", True, "Given."), ("rev2", True, "Only for part (a)."), ("reservoir", True, "Indoors and outdoors stay at their temperatures.", "The house and the outdoors act as reservoirs."),
+                     ("steady", True, "Steady, with the heat pump at full power.", "Steady operation: the heat pump runs flat out and the house stays at T<sub>in</sub>."), ("cycle", True, "The heat pump runs in a cycle."),
+                     ("rev", False, "The real heat pump reaches only a fraction of Carnot.")]),
+             multi([("Q̇<sub>H</sub> = k(T<sub>in</sub> − T<sub>out</sub>)", True, ""), ("COP<sub>Carnot</sub> = T<sub>H</sub>/(T<sub>H</sub> − T<sub>L</sub>), in K", True, ""),
+                    ("Q̇<sub>H</sub> = COP·Ẇ<sub>max</sub>, so k(ΔT)² = f·Ẇ<sub>max</sub>T<sub>H</sub>", True, ""), ("Backup = Q̇<sub>loss</sub> − COP·Ẇ<sub>max</sub>", True, ""),
+                    ("COP = T<sub>L</sub>/(T<sub>H</sub> − T<sub>L</sub>)", False, "That's the refrigerator COP.")], FIRST_CYC),
+             cycle_terms("Q̇<sub>L</sub>", "Q̇<sub>H</sub>", True, "Q̇<sub>H</sub> = Q̇<sub>L</sub> + Ẇ<sub>in</sub>, and Q̇<sub>H</sub> must equal the house's loss"),
+             props([("k", kk, "kW/°C", "Given / computed", 0.003, None), ("T<sub>H</sub>", TH, "K", "Given / computed", 0.002, None)]),
+             calc([f"k = {k} kJ/h·°C ÷ 3600 = {sg(kk, 4)} kW/°C (ΔT in °C equals ΔT in K)",
+                   f"Reversible: kΔT = Ẇ·T<sub>H</sub>/ΔT, so ΔT = √(Ẇ·T<sub>H</sub>/k) = √({Wmax}·{num(TH, 2)}/{sg(kk, 4)}) = <b>{sg(dTrev)} °C</b>, so T<sub>out,min</sub> = {num(Trev, 1)} °C",
+                   f"Real: ΔT = √(f·Ẇ·T<sub>H</sub>/k) = √({f}·{Wmax}·{num(TH, 2)}/{sg(kk, 4)}) = <b>{sg(dTreal)} °C</b>, so T<sub>out,min</sub> = {num(Treal, 1)} °C",
+                   f"At {fT(Tcold)}: loss = {sg(kk, 4)}({Tin} − ({Tcold})) = {sg(need)} kW; COP = {f}·{num(TH, 2)}/({Tin} − ({Tcold})) = {sg(COPc)}; heat pump gives {sg(COPc * Wmax)} kW",
+                   f"Backup = {sg(need)} − {sg(COPc * Wmax)} = <b>{sg(back)} kW</b>"]),
+             mc(8, "Why is the real heat pump's limit so much warmer than the reversible one?",
+                ["ΔT grows only as the square root of the COP fraction, but the reversible limit is far below any real climate; the real limit is what matters, and it lands in Everett's cold snaps",
+                 "Because the house loses less heat", "It shouldn't be; something is wrong", "Because real heat pumps don't follow the first law"],
+                0, "Cold snaps are exactly when backup resistance heat kicks in, at a COP of 1. That's when bills spike, which is why cold-climate heat pumps, insulation and air sealing matter most for households with the least budget slack.")]
+    return stem, parts, steps, None, prm(locals())
+
 # ---------------------------------------------------------------- build
 def build(nvar=24, seed=20261109):
     out = []
@@ -965,7 +1413,8 @@ def build(nvar=24, seed=20261109):
             assert [s["n"] for s in steps] == list(range(1, 9)), (T["id"], [s["n"] for s in steps])
             vs.append({"stem": stem, "fig": None, "parts": parts, "steps": steps, "ctx": ctx, "_p": p})
         assert len(vs) == nvar, (T["id"], len(vs), tries)
-        out.append({"id": T["id"], "title": T["title"], "ch": T["ch"], "slot": T["slot"], "pts": T["pts"], "tier": T["tier"], "v": vs})
+        out.append({"id": T["id"], "title": T["title"], "ch": T["ch"], "slot": T["slot"], "pts": T["pts"], "tier": T["tier"], "v": vs,
+                    **{k: T[k] for k in ("grp", "note", "us") if k in T}})
     return out
 
 if __name__ == "__main__":

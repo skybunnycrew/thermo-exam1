@@ -23,6 +23,10 @@ html = html[:j] + "\n<script>const BANK4 = " + b4 + ";</script>" + html[j:]
 rep(".pill.practicing{background:var(--near-bg);color:var(--near);border-color:transparent}",
     ".pill.practicing{background:var(--near-bg);color:var(--near);border-color:transparent}\n.pill.tier{background:var(--accent-soft);color:var(--accent-text);border-color:transparent}\n.pill.hardest{background:var(--accent);color:var(--accent-ink);border-color:transparent}")
 
+# ---------- English tables for the US-unit problems
+rep('const TABLES = ["A-1","A-2a","A-3","A-4","A-5","A-6","A-7","A-11","A-12","A-13","A-17","Given / computed"];',
+    'const TABLES = ["A-1","A-2a","A-3","A-4","A-5","A-6","A-7","A-11","A-12","A-13","A-17","A-1E","A-2Ea","A-4E","A-11E","Given / computed"];')
+
 # ---------- nav
 rep('    <a href="#guided" data-tab="guided">Guided problems</a>\n',
     '    <a href="#guided" data-tab="guided">Guided problems</a>\n    <a href="#challenge" data-tab="challenge">Challenge</a>\n')
@@ -57,9 +61,20 @@ rep("function pickVariant(tid){", r"""function viewChallenge(app){
         <div class="row"><button class="btn" id="cex">Challenge practice exam</button></div></div>
     </section>`));
   $("#cex", app).onclick = () => { S.exsel = "ec"; save(); go("exam"); };
+  const card = t => {
+      const st = status(t.id);
+      const c = el(`<div class="card" style="display:grid;gap:10px"><div class="row" style="justify-content:space-between;align-items:flex-start"><b>${esc(t.title)}</b><span class="row" style="gap:6px"><span class="pill ${t.tier === "hardest" ? "hardest" : "tier"}">${TIER[t.tier]}</span>${t.us ? `<span class="pill">US units</span>` : ""}<span class="pill ${st}">${STATUS_LABEL[st]}</span></span></div>
+        ${t.note ? `<div class="small muted">${esc(t.note)} · ${CHNAME[t.ch].split(" · ")[0]}</div>` : ""}
+        <div class="row"><button class="btn" data-m="worked">Worked</button><button class="btn primary" data-m="guided">Guided</button><button class="btn" data-m="solo">Solo</button></div></div>`);
+      $$("button", c).forEach(b => b.onclick = () => openProblem(t.id, b.dataset.m));
+      return c;
+  };
+  const past = el(`<section class="list"><div class="eyebrow">Remade from past exams</div><p class="small muted" style="margin:4px 0 10px">New numbers and fixes on problems from earlier ENGR&amp;224 exams and finals. Three use US units (°F, psia, lbm, Btu), as old exams did; the English tables are in your book's appendix with an E after the number.</p><div class="grid2"></div></section>`);
+  BANK4.templates.filter(t => t.grp === "past").forEach(t => $(".grid2", past).append(card(t)));
+  app.append(past);
   for (const ch of [5, 6, 7, 9]){
     const sec = el(`<section class="list"><div class="eyebrow">${CHNAME[ch]}</div><div class="grid2"></div></section>`);
-    BANK4.templates.filter(t => t.ch === ch).forEach(t => {
+    BANK4.templates.filter(t => t.ch === ch && t.grp !== "past").forEach(t => {
       const st = status(t.id);
       const c = el(`<div class="card" style="display:grid;gap:10px"><div class="row" style="justify-content:space-between;align-items:flex-start"><b>${esc(t.title)}</b><span class="row" style="gap:6px"><span class="pill ${t.tier === "hardest" ? "hardest" : "tier"}">${TIER[t.tier]}</span><span class="pill ${st}">${STATUS_LABEL[st]}</span></span></div>
         <div class="row"><button class="btn" data-m="worked">Worked</button><button class="btn primary" data-m="guided">Guided</button><button class="btn" data-m="solo">Solo</button></div></div>`);
@@ -75,14 +90,14 @@ function pickVariant(tid){""")
 rep("""      <div class="row"><button class="btn primary" data-go="locator">Property drill</button><button class="btn" data-go="model">Which table?</button></div></section>`));""",
     """      <div class="row"><button class="btn primary" data-go="locator">Property drill</button><button class="btn" data-go="model">Which table?</button></div></section>`));
   app.append(el(`<section class="card exam2 list"><div class="eyebrow">New: harder than the exam</div>
-      <p><b>Challenge problems:</b> ${ORDER4.length} problems built to be tougher than Exam 2, each with a full worked solution in the eight steps: a turbine and bypass valve feeding a mixer, a jet engine core, a regenerative gas turbine on two fuels, a heat-driven vaccine cooler, and more.</p>
+      <p><b>Challenge problems:</b> ${ORDER4.length} problems built to be tougher than Exam 2, each with a full worked solution in the eight steps: a turbine and bypass valve feeding a mixer, a jet engine core, a regenerative gas turbine on two fuels, a heat-driven vaccine cooler, plus nine remade from past exams, some in US units.</p>
       <p class="small muted">Practice that's harder than the test pays off on the test. Start with the exam-level problems, then climb.</p>
       <div class="row"><button class="btn primary" data-go="challenge">Challenge problems</button></div></section>`));""")
 
 # ---------- practice exam: a third option
 rep('const SLOTS2 = ["TABLE2", ["E1","E2","E3","E4","E5"], ["E6","E7","E8","E9"], ["E10","E11","E12"], ["E13","E14","E15"], ["E16","E17","E18","E19","E20"]];',
     'const SLOTS2 = ["TABLE2", ["E1","E2","E3","E4","E5"], ["E6","E7","E8","E9"], ["E10","E11","E12"], ["E13","E14","E15"], ["E16","E17","E18","E19","E20"]];\n'
-    'const SLOTS3 = ["TABLE2", ["C2","C15"], ["C16","C3"], ["C7","C8"], ["C1","C4","C5","C6","C9"], ["C10","C11","C12","C13","C14"]];')
+    'const SLOTS3 = ["TABLE2", ["C2","C15","P3"], ["C16","C3","P1"], ["C7","C8","P2","P9"], ["C1","C4","C5","C6","C9","P4","P5","P6","P7","P8"], ["C10","C11","C12","C13","C14"]];')
 rep('  e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 through Brayton",',
     '  ec:{name:"Challenge", covers:"Ch. 5–7 and 9, harder than Exam 2", intro:"Six problems built to be harder than Exam 2: a water and R-134a table fill-in, then a multi-stream device, a heat exchanger with entropy generation, a second-law problem, an entropy problem and a cycle, all from the Challenge set. Most people won\'t finish in two hours; take it a few days before the exam, then study the worked solutions for whatever you didn\'t reach.", tables:"Çengel tables (A-1 to A-7, A-11 to A-13, A-17)"},\n'
     '  e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 through Brayton",')

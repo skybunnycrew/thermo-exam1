@@ -14,6 +14,8 @@ def Tof(f, target, lo=200, hi=2600): return brentq(lambda T: f(T) - target, lo, 
 
 def solve(tid, p):
     g = p.get
+    if tid.startswith("P"):
+        return solve_past(tid, p)
     if tid == "C1":
         P1, T1, P2 = g("P1") * 1e3, K(g("T1")), g("P2") * 1e3
         h1 = w("H", "P", P1, "T", T1) / 1e3; s1 = w("S", "P", P1, "T", T1)
@@ -108,6 +110,55 @@ def solve(tid, p):
         sw1, sw2 = w("S", "T", K(g("Twi")), "Q", 0) / 1e3, w("S", "T", K(g("Two")), "Q", 0) / 1e3
         mR = mw * (hw1 - hw2) / (hg - h1)
         return [x2, mR, mR * (s2 - s1), mR * (sgv - s2) + mw * (sw2 - sw1)]
+    raise KeyError(tid)
+
+FK = lambda F: (F - 32) / 1.8 + 273.15
+def wEh(F): return w("H", "T", FK(F), "Q", 0) / 2326
+def wEs(F): return w("S", "T", FK(F), "Q", 0) / 4186.8
+def wEv(F): return 16.0185 / w("D", "T", FK(F), "Q", 0)
+def solve_past(tid, p):
+    g = p.get; R0 = 459.67
+    if tid == "P1":
+        QL = g("mw") * (wEh(g("Twi")) - wEh(g("Two"))); T = FK(g("Te"))
+        hf, hg = r("H", "T", T, "Q", 0) / 2326, r("H", "T", T, "Q", 1) / 2326; hin = hf + g("xin") * (hg - hf)
+        Wb = g("W") * 2544.43 / 3600; QH = QL + Wb
+        return [QL / (hg - hin), QH * 3600, QH / Wb, (g("TH") + R0) / (g("TH") - g("Twi"))]
+    if tid == "P2":
+        m = g("Vd") / wEv(g("T1")); QL = m * (wEh(g("T2")) - wEh(g("T1"))); QH = (g("TH") + R0) * m * (wEs(g("T2")) - wEs(g("T1")))
+        return [m, QL, (QH - QL) * 1.055056 / 1000, 100 * (QH - QL) / QH]
+    if tid == "P3":
+        P1, T1, T2 = g("P1") * 1e3, K(g("T1")), K(g("T2"))
+        h1, s1 = w("H", "P", P1, "T", T1) / 1e3, w("S", "P", P1, "T", T1) / 1e3
+        h2, s2 = w("H", "T", T2, "Q", 1) / 1e3, w("S", "T", T2, "Q", 1) / 1e3
+        dke = (g("V1") ** 2 - g("V2") ** 2) / 2000; q = h1 - h2 + dke - g("w")
+        h2s = w("H", "T", T2, "S", s1 * 1e3) / 1e3
+        return [q, s2 - s1 + q / g("T0"), 100 * g("w") / (h1 - h2s + dke)]
+    if tid == "P4":
+        cpE, RE = 0.240, 0.06855; y = g("y"); Ti, Tc = g("Tin") + R0, g("Tc") + R0; Th = (Ti - y * Tc) / (1 - y)
+        sT = y * cpE * math.log(Tc / Ti) + (1 - y) * cpE * math.log(Th / Ti)
+        return [Th - R0, sT + RE * math.log(g("Pin")), math.exp(-sT / RE)]
+    if tid == "P5":
+        mA, mB, TA, TB, PA, PB = g("mA"), g("mB"), g("TA"), g("TB"), g("PA"), g("PB")
+        Tf = Tof(u_true, (mA * u_true(TA) + mB * u_true(TB)) / (mA + mB))
+        Pf = (mA + mB) * R * Tf / (mA * R * TA / PA + mB * R * TB / PB)
+        return [Tf, Pf, mA * (s0_true(Tf) - s0_true(TA) - R * math.log(Pf / PA)) + mB * (s0_true(Tf) - s0_true(TB) - R * math.log(Pf / PB))]
+    if tid == "P6":
+        P1, T1, V1, P2, n = g("P1"), g("T1"), g("V1"), g("P2"), g("n")
+        m = P1 * V1 / (R * T1); T2 = T1 * (P2 / P1) ** ((n - 1) / n); Wi = m * R * (T2 - T1) / (n - 1); Q = Wi - m * (u_true(T2) - u_true(T1))
+        return [T2, Wi, Q, m * (s0_true(T2) - s0_true(T1) - R * math.log(P2 / P1)) + Q / T1]
+    if tid == "P7":
+        T1, rr, n = g("T1"), g("r"), g("n"); e = (n - 1) / n; x = math.sqrt(rr)
+        ws = 2 * n * R * T1 / (n - 1) * (x ** e - 1); w1 = n * R * T1 / (n - 1) * (rr ** e - 1)
+        return [100 * x, ws, 100 * (1 - ws / w1), cp * T1 * (x ** e - 1)]
+    if tid == "P8":
+        P1, T1, P2, m = g("P1") * 1e3, K(g("T1")), g("P2") * 1e3, g("m")
+        D = w("D", "P", P1, "T", T1); u1, s1 = w("U", "P", P1, "T", T1) / 1e3, w("S", "P", P1, "T", T1) / 1e3
+        T2 = w("T", "P", P2, "D", D); u2, s2 = w("U", "P", P2, "D", D) / 1e3, w("S", "P", P2, "D", D) / 1e3
+        return [T2 - 273.15, m * (u2 - u1), m * (s2 - s1)]
+    if tid == "P9":
+        kk = g("k") / 3600; TH = g("Tin") + 273.15; Wm, f = g("Wmax"), g("f")
+        need = kk * (g("Tin") - g("Tcold")); cop = f * TH / (g("Tin") - g("Tcold"))
+        return [math.sqrt(Wm * TH / kk), math.sqrt(f * Wm * TH / kk), need - cop * Wm]
     raise KeyError(tid)
 
 if __name__ == "__main__":
