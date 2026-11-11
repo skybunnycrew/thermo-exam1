@@ -5,8 +5,11 @@ DST, SRC = sys.argv[1], sys.argv[2]
 html = open(DST, encoding="utf-8").read()
 assert "const BANK4" not in html, "already patched"
 tpls = json.load(open(SRC, encoding="utf-8"))
+held = [t["id"] for t in tpls if t.get("hold")]
+tpls = [t for t in tpls if not t.get("hold")]          # held for the final: never written into the public page
 for t in tpls:
     for v in t["v"]: v.pop("_p", None)
+assert not any("Rankine" in json.dumps(t) for t in tpls)
 b4 = json.dumps({"templates": tpls}, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 
 def rep(old, new, count=1):
@@ -90,22 +93,36 @@ function pickVariant(tid){""")
 rep("""      <div class="row"><button class="btn primary" data-go="locator">Property drill</button><button class="btn" data-go="model">Which table?</button></div></section>`));""",
     """      <div class="row"><button class="btn primary" data-go="locator">Property drill</button><button class="btn" data-go="model">Which table?</button></div></section>`));
   app.append(el(`<section class="card exam2 list"><div class="eyebrow">New: harder than the exam</div>
-      <p><b>Challenge problems:</b> ${ORDER4.length} problems built to be tougher than Exam 2, each with a full worked solution in the eight steps: a turbine and bypass valve feeding a mixer, a jet engine core, a regenerative gas turbine on two fuels, a heat-driven vaccine cooler, plus nine remade from past exams, some in US units.</p>
+      <p><b>Challenge problems:</b> ${ORDER4.length} problems built to be tougher than Exam 2, each with a full worked solution in the eight steps: a turbine and bypass valve feeding a mixer, an Otto engine read from its pressure sensor, a heat-driven vaccine cooler, a diesel generator, plus nine remade from past exams, some in US units.</p>
       <p class="small muted">Practice that's harder than the test pays off on the test. Start with the exam-level problems, then climb.</p>
       <div class="row"><button class="btn primary" data-go="challenge">Challenge problems</button></div></section>`));""")
 
 # ---------- practice exam: a third option
 rep('const SLOTS2 = ["TABLE2", ["E1","E2","E3","E4","E5"], ["E6","E7","E8","E9"], ["E10","E11","E12"], ["E13","E14","E15"], ["E16","E17","E18","E19","E20"]];',
-    'const SLOTS2 = ["TABLE2", ["E1","E2","E3","E4","E5"], ["E6","E7","E8","E9"], ["E10","E11","E12"], ["E13","E14","E15"], ["E16","E17","E18","E19","E20"]];\n'
-    'const SLOTS3 = ["TABLE2", ["C2","C15","P3"], ["C16","C3","P1"], ["C7","C8","P2","P9"], ["C1","C4","C5","C6","C9","P4","P5","P6","P7","P8"], ["C10","C11","C12","C13","C14"]];')
+    'const SLOTS2 = ["TABLE2", ["E1","E2","E3","E4","E5"], ["E6","E7","E8","E9"], ["E10","E11","E12"], ["E13","E14","E15"], ["E16","E17","E18"]];\n'
+    'const SLOTS3 = ["TABLE2", ["C2","C15","P3"], ["C16","C3","P1"], ["C7","C8","P2","P9"], ["C1","C4","C5","C6","C9","P4","P5","P6","P7","P8"], ["C13","C14","C17"]];')
 rep('  e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 through Brayton",',
-    '  ec:{name:"Challenge", covers:"Ch. 5–7 and 9, harder than Exam 2", intro:"Six problems built to be harder than Exam 2: a water and R-134a table fill-in, then a multi-stream device, a heat exchanger with entropy generation, a second-law problem, an entropy problem and a cycle, all from the Challenge set. Most people won\'t finish in two hours; take it a few days before the exam, then study the worked solutions for whatever you didn\'t reach.", tables:"Çengel tables (A-1 to A-7, A-11 to A-13, A-17)"},\n'
+    '  ec:{name:"Challenge", covers:"Ch. 5–7 and 9, harder than Exam 2", intro:"Six problems built to be harder than Exam 2: a water and R-134a table fill-in, then a multi-stream device, a heat exchanger with entropy generation, a second-law problem, an entropy problem and an Otto or Diesel cycle, all from the Challenge set. Most people won\'t finish in two hours; take it a few days before the exam, then study the worked solutions for whatever you didn\'t reach.", tables:"Çengel tables (A-1 to A-7, A-11 to A-13, A-17)"},\n'
     '  e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 through Brayton",')
 rep('  const slots = which === "e2" ? SLOTS2 : SLOTS;', '  const slots = which === "e2" ? SLOTS2 : which === "ec" ? SLOTS3 : SLOTS;')
 rep('${Object.entries(EXDEF).reverse().map(([k, d]) =>', '${["e2", "ec", "e1"].map(k => [k, EXDEF[k]]).map(([k, d]) =>')
 rep('        ${X === "e2" ? `<ul class="clean"><li>Mass balance', '        ${X !== "e1" ? `<ul class="clean"><li>Mass balance')
 rep('<td>${x.which === "e2" ? "2" : "1"}</td>', '<td>${x.which === "e2" ? "2" : x.which === "ec" ? "Challenge" : "1"}</td>')
 rep('For each state${E.which === "e2" ? " of water or R-134a" : " of water"}', 'For each state${E.which === "e2" || E.which === "ec" ? " of water or R-134a" : " of water"}')
+
+# ---------- Exam 2 scope (Matthew, Nov 9): Brayton is off Exam 2, so its guided problems leave the public page
+i = html.index("<script>const BANK3 = "); j = html.index("</script>", i)
+b3 = json.loads(html[i + len("<script>const BANK3 = "):j].rstrip().rstrip(";"))
+b3["templates"] = [t for t in b3["templates"] if t["id"] not in ("E19", "E20")]
+html = html[:i] + "<script>const BANK3 = " + json.dumps(b3, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/") + ";" + html[j:]
+rep('{name:"Cycles", ids:["E16","E17","E18","E19","E20"]}', '{name:"Cycles", ids:["E16","E17","E18"]}')
+rep('covers:"Ch. 5–7 and Ch. 9 through Brayton", ready:true}', 'covers:"Ch. 5–7 and Ch. 9: Otto, Diesel and dual cycles", ready:true}')
+rep('e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 through Brayton",', 'e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 (Otto, Diesel, dual)",')
+rep('<li>Otto, Diesel, dual and Brayton: state relations, q<sub>in</sub>, q<sub>out</sub>, η, back work ratio, MEP</li>', '<li>Otto, Diesel and dual: state relations, q<sub>in</sub>, q<sub>out</sub>, η, MEP</li>')
+rep('"s":"A Brayton cycle runs with pressure ratio 10 and compressor inlet at 300 K. The problem says \\"cold-air-standard.\\""',
+    '"s":"An ideal (isentropic) air compressor raises the pressure by a factor of 10 from 300 K. The problem says to use constant specific heats at room temperature."')
+rep('T<sub>2s<\\/sub> = 300(10)<sup>0.2857<\\/sup> = 579 K. Same relation for the turbine.', 'T<sub>2s<\\/sub> = 300(10)<sup>0.2857<\\/sup> = 579 K.')
+assert "Brayton cycle runs" not in html
 
 open(DST, "w", encoding="utf-8").write(html)
 print("ok", len(html))

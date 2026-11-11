@@ -94,6 +94,11 @@ def solve(tid, p):
         T2 = T1 * rr ** 0.4; T3 = T2 + q / cp; rc = T3 / T2; T4 = T3 * (rc / rr) ** 0.4
         wn = q - cv * (T4 - T1); v1 = R * T1 / P1; mep = wn / (v1 * (1 - 1 / rr))
         return [rc, 100 * wn / q, mep, mep * g("Vd") / 1000 * g("rpm") / 120]
+    if tid == "C17":
+        rr, T1, P1, P3 = g("r"), g("T1"), g("P1"), g("P3")
+        T2, P2 = T1 * rr ** 0.4, P1 * rr ** 1.4; T3 = T2 * P3 / P2; T4 = T3 / rr ** 0.4
+        wn = cv * (T3 - T2) - cv * (T4 - T1); mep = wn / (R * T1 / P1 * (1 - 1 / rr))
+        return [T3, cv * (T3 - T2), mep, mep * g("Vd") / 1000 * g("rpm") / 120]
     if tid == "C15":
         P = g("P") * 1e3
         h1, s1 = w("H", "P", P, "T", K(g("T1"))) / 1e3, w("S", "P", P, "T", K(g("T1"))) / 1e3

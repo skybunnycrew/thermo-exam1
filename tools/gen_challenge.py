@@ -853,6 +853,56 @@ def C14(rng):
                 0, f"That's {sg(Wd / Vd, 3)} kW per liter. An ideal cycle has no friction, heat loss or pumping losses, so a real engine of this size breathing outside air would make less. If you're off by a factor of 2, 60 or 1000, check the four-stroke factor, rpm and liters.")]
     return stem, parts, steps, ctx, prm(locals())
 
+# =================================================================== C17: Otto, read backward from a pressure sensor
+@template("C17", "Otto engine read from its pressure sensor", 9, "F", 22, "challenge")
+def C17(rng):
+    r = rng.choice([7, 8, 9, 10, 11]); T1 = rng.choice([290, 300, 310, 320]); P1 = rng.choice([90, 95, 100])
+    P3 = rng.choice([4000, 4500, 5000, 5500, 6000, 6500, 7000, 8000, 9000])
+    Vd = rng.choice([0.05, 0.08, 0.10, 0.15, 0.2, 0.25]); rpm = rng.choice([2800, 3000, 3200, 3600])
+    T2 = T1 * r ** 0.4; P2 = P1 * r ** 1.4; T3 = T2 * P3 / P2; assert 1500 < T3 < 2700
+    qin = CVA * (T3 - T2); T4 = T3 / r ** 0.4; qout = CVA * (T4 - T1); wn = qin - qout; eta = wn / qin
+    v1 = RA * T1 / P1; mep = wn / (v1 * (1 - 1 / r)); Wd = mep * Vd / 1000 * rpm / 120
+    T3wrong = T2 * P3 / (P1 * r)
+    stem = (f"A small four-stroke gasoline engine (a landscaping crew's mower) has a total displacement of {Vd * 1000:g} cm³, a compression ratio of {r}, and runs at {rpm} rpm. "
+            f"At the start of compression the air is at {P1} kPa and {T1} K. A pressure sensor in the cylinder reads a peak pressure of {P3 / 1000:g} MPa. "
+            "Model it as an ideal Otto cycle with cold-air-standard assumptions and determine (a) the peak temperature, (b) the heat added per kilogram of air, (c) the thermal efficiency and mean effective pressure "
+            "(enter the MEP), and (d) the power output.")
+    parts = [part("a", "Peak temperature, T<sub>3</sub>", "K", T3, 0.006, 6,
+                  [(T3wrong, "P<sub>2</sub> isn't P<sub>1</sub>r. Along the isentrope, P<sub>2</sub> = P<sub>1</sub>r<sup>k</sup>."), (T1 * P3 / P1, "State 3 is reached from state 2 at constant volume, so T<sub>3</sub>/T<sub>2</sub> = P<sub>3</sub>/P<sub>2</sub>. Using state 1 ignores the compression.")]),
+             part("b", "Heat added, q<sub>in</sub>", "kJ/kg", qin, 0.01, 5, [(CPA * (T3 - T2), "Otto adds heat at constant volume: use c<sub>v</sub>, not c<sub>p</sub>.")]),
+             part("c", "Mean effective pressure, MEP", "kPa", mep, 0.015, 5, [(wn / v1, "MEP divides by the displacement per kg, v<sub>1</sub> − v<sub>2</sub> = v<sub>1</sub>(1 − 1/r), not v<sub>1</sub>."), (P3 * (1 - 1 / r), "MEP comes from the net work, not from the peak pressure.")]),
+             part("d", "Power output, Ẇ", "kW", Wd, 0.015, 6, [(Wd * 2, "Four-stroke: one power stroke every two revolutions. Divide by 2."), (mep * Vd / 1000 * rpm / 2, "Revolutions per minute: divide by 60 for per second."),
+                                                               (Wd * 1000, "cm³ to m³: divide by 10⁶.")])]
+    ctx = {"t": "Who breathes the exhaust?",
+           "b": "Small gasoline engines in mowers and leaf blowers have no catalytic converter. The California Air Resources Board found that one hour of a commercial backpack leaf blower makes as much smog-forming pollution as driving a car about 1,100 miles, and that this equipment now out-emits the state's passenger cars. California required most new small off-road engines to be zero-emission starting with model year 2024 and set aside $30 million to help small landscaping businesses buy electric equipment.",
+           "q": "The people closest to these engines are the workers running them, all day. Who pays for switching a crew to battery equipment, and what would make that switch fair for small, often family-run landscaping businesses?",
+           "src": ["CARB: most new small off-road engines zero-emission by 2024 (Dec 2021)", "https://ww2.arb.ca.gov/node/16486"]}
+    steps = [self_step("Work an ideal Otto cycle backward from a measured peak pressure, then turn the work per kilogram into engine power. Plan: compress (state 2), use the constant-volume line to get T<sub>3</sub> from P<sub>3</sub>, expand (state 4), then MEP and power."),
+             dia("Which P-v diagram is the Otto cycle?", CYC_PV, 0, "Otto: two isentropes joined by two constant-volume lines. The sensor's peak pressure is the top of the constant-volume heat-addition line, state 3."),
+             cyc_assume([f"r = {r}, P<sub>1</sub> = {P1} kPa, T<sub>1</sub> = {T1} K", f"P<sub>3</sub> = {P3 / 1000:g} MPa (measured)", f"V<sub>d</sub> = {Vd * 1000:g} cm³, {rpm} rpm, four-stroke"],
+                        ["T<sub>3</sub> (K)", "q<sub>in</sub> (kJ/kg)", "MEP (kPa)", "Ẇ (kW)"],
+                        [("coldair", True, "The problem says so (rule 4)."), ("intrev", True, "Ideal cycle: compression and expansion are isentropic."), ("constv", True, "Otto adds and rejects heat at constant volume."),
+                         ("four", True, "Given."), ("stationary", True, "Standard for cycles."), ("airstd", False, "The problem says cold-air-standard."), ("constP", False, "That's Diesel's heat addition.")]),
+             multi([("T<sub>2</sub> = T<sub>1</sub>r<sup>k−1</sup>; P<sub>2</sub> = P<sub>1</sub>r<sup>k</sup>", True, ""), ("Constant volume 2→3: T<sub>3</sub>/T<sub>2</sub> = P<sub>3</sub>/P<sub>2</sub>", True, ""),
+                    ("q<sub>in</sub> = c<sub>v</sub>(T<sub>3</sub> − T<sub>2</sub>); q<sub>out</sub> = c<sub>v</sub>(T<sub>4</sub> − T<sub>1</sub>)", True, ""), ("MEP = w<sub>net</sub>/(v<sub>1</sub> − v<sub>2</sub>); Ẇ = MEP·V<sub>d</sub>·(rpm/60)/2", True, ""),
+                    (FIRST_CL + " (per kg, for each process)", True, ""), ("P<sub>2</sub> = P<sub>1</sub>r", False, "That would hold only if T stayed constant."), ("q<sub>in</sub> = c<sub>p</sub>(T<sub>3</sub> − T<sub>2</sub>)", False, "That's Diesel.")], FIRST_CL),
+             strike_custom([term("qin", "q<sub>in</sub>", "L", "+"), term("win", "w<sub>b,in</sub>", "L", "+", True, ["constv"], "Constant volume: no boundary work."),
+                            term("qout", "q<sub>out</sub>", "L", "−", True, ["dir"], "Heat comes in during 2→3."), term("wout", "w<sub>b,out</sub>", "L", "−", True, ["constv"], "Constant volume: no boundary work."),
+                            term("du", "Δu", "R", ""), term("dke", "Δke", "R", "+", True, ["stationary"], ""), term("dpe", "Δpe", "R", "+", True, ["stationary"], "")],
+                           "Process 2→3: q<sub>in</sub> = u<sub>3</sub> − u<sub>2</sub> = c<sub>v</sub>(T<sub>3</sub> − T<sub>2</sub>)", p="Apply the first law to the heat-addition process, 2→3. Cross out every term that drops."),
+             props([("c<sub>v</sub> for air", CVA, "kJ/kg·K", "A-2a", 0.003, "300 K"), ("k for air", 1.4, "", "A-2a", 0.003, "300 K"), ("R for air", RA, "kJ/kg·K", "A-1", 0.003, "air")]),
+             calc([f"T<sub>2</sub> = ({T1})({r})<sup>0.4</sup> = {sg(T2)} K; P<sub>2</sub> = ({P1})({r})<sup>1.4</sup> = {sg(P2)} kPa",
+                   f"T<sub>3</sub> = T<sub>2</sub>(P<sub>3</sub>/P<sub>2</sub>) = ({sg(T2)})({P3}/{sg(P2)}) = <b>{sg(T3)} K</b>",
+                   f"q<sub>in</sub> = 0.718({sg(T3)} − {sg(T2)}) = <b>{sg(qin)} kJ/kg</b>",
+                   f"T<sub>4</sub> = T<sub>3</sub>/r<sup>0.4</sup> = {sg(T4)} K; q<sub>out</sub> = 0.718({sg(T4)} − {T1}) = {sg(qout)} kJ/kg; w<sub>net</sub> = {sg(wn)} kJ/kg; η<sub>th</sub> = {pct(eta):.1f}% (= 1 − 1/r<sup>0.4</sup>)",
+                   f"v<sub>1</sub> = RT<sub>1</sub>/P<sub>1</sub> = {sg(v1)} m³/kg; MEP = w<sub>net</sub>/[v<sub>1</sub>(1 − 1/r)] = <b>{sg(mep)} kPa</b>",
+                   f"Ẇ = MEP·V<sub>d</sub>·(rpm/60)/2 = ({sg(mep)})({Vd}/1000)({rpm}/60)/2 = <b>{sg(Wd)} kW</b> ({sg(Wd / 0.7457, 3)} hp)"]),
+             mc(8, "The efficiency came out the same no matter what the sensor read. Is that right?",
+                ["Yes: for a cold-air Otto cycle η = 1 − 1/r<sup>k−1</sup> depends only on r. The peak pressure changes how much work each cycle makes (MEP and power), not the fraction of heat turned into work",
+                 "No, a higher peak pressure always raises the efficiency", "No, efficiency should depend on rpm", "Yes, because the engine is four-stroke"],
+                0, f"That's why the sensor matters for power, not efficiency. Real small engines reach well under the ideal {pct(eta):.0f}%, often around 20 to 30%, because of heat loss, friction and incomplete burning.")]
+    return stem, parts, steps, ctx, prm(locals())
+
 # =================================================================== C15: desuperheater
 @template("C15", "Desuperheater: spraying water into steam", 5, "B", 16, "challenge")
 def C15(rng):
@@ -1395,6 +1445,10 @@ def P9(rng):
                 0, "Cold snaps are exactly when backup resistance heat kicks in, at a COP of 1. That's when bills spike, which is why cold-climate heat pumps, insulation and air sealing matter most for households with the least budget slack.")]
     return stem, parts, steps, None, prm(locals())
 
+HOLD_FINAL = {"C10", "C11", "C12"}   # Brayton family: off Exam 2 (Matthew, Nov 9); held for the final
+for _T in TEMPLATES:
+    if _T["id"] in HOLD_FINAL: _T["hold"] = "final"
+
 # ---------------------------------------------------------------- build
 def build(nvar=24, seed=20261109):
     out = []
@@ -1414,7 +1468,7 @@ def build(nvar=24, seed=20261109):
             vs.append({"stem": stem, "fig": None, "parts": parts, "steps": steps, "ctx": ctx, "_p": p})
         assert len(vs) == nvar, (T["id"], len(vs), tries)
         out.append({"id": T["id"], "title": T["title"], "ch": T["ch"], "slot": T["slot"], "pts": T["pts"], "tier": T["tier"], "v": vs,
-                    **{k: T[k] for k in ("grp", "note", "us") if k in T}})
+                    **{k: T[k] for k in ("grp", "note", "us", "hold") if k in T}})
     return out
 
 if __name__ == "__main__":
