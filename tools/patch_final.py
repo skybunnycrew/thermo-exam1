@@ -35,6 +35,13 @@ html = html[:k] + "\n<script>const BANK5 = " + b5 + ";</script>" + html[k:]
 rep(".pill.hardest{background:var(--accent);color:var(--accent-ink);border-color:transparent}",
     ".pill.hardest{background:var(--accent);color:var(--accent-ink);border-color:transparent}\n.pill.exam{background:var(--surface);color:var(--text);border-color:var(--line)}\n.hero > *{min-width:0}\n#app{grid-template-columns:minmax(0,1fr)}")
 rep("  .hero{grid-template-columns:1fr}", "  .hero{grid-template-columns:minmax(0,1fr)}")
+# nav: the tabs outgrew one line (Final exam + Cycle animations); the hidden-scrollbar strip cut the last tab off on desktops.
+# Wide screens wrap onto a second line; phones keep the sideways scroll, with a fade at the right edge as a hint.
+rep("nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}",
+    "nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right,#000 85%,transparent);mask-image:linear-gradient(to right,#000 85%,transparent)}\n"
+    "@media (min-width:700px){nav.tabs .wrap{flex-wrap:wrap;overflow-x:visible;-webkit-mask-image:none;mask-image:none;row-gap:0}nav.tabs a{padding:10px 10px 8px}}")
+rep('<a href="#guided" data-tab="guided">Guided problems</a>', '<a href="#guided" data-tab="guided">Guided</a>')
+rep('<a href="cycles.html">Cycle animations</a>', '<a href="cycles.html">Animations</a>')
 
 # ---------- config: the final's date and scope
 rep('{name:"Final exam", date:"2026-12-08", time:"10:00–11:50 a.m.", where:"finals week", covers:"the whole course", ready:false}',
