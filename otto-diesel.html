@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otto and Diesel Cycles in Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Instrument-panel layout: controls on top, engine and P-v side by side, crank timeline, then "what's happening". */
+  --bg: #f3f4f6; --panel: #ffffff; --ink: #1c2230; --muted: #5d6676; --grid: #dde1e8;
+  --ideal: #2a64ad; --real: #c00000; --fire: #d9822b;
+  --metal: #9aa3b2; --metal-2: #6f7888; --hatch: rgba(93,102,118,0.55);
+  --band-a: #e7ebf2; --band-b: #f4f6f9; --line: #d3d8e0;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #1b2029; --ink: #e8ebf1; --muted: #9ba4b4; --grid: #2c3340;
+    --ideal: #6ea8f0; --real: #ff6b6b; --fire: #f0a24a;
+    --metal: #5a6474; --metal-2: #7c8696; --hatch: rgba(155,164,180,0.45);
+    --band-a: #252c38; --band-b: #1f252f; --line: #2f3744; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --panel: #1b2029; --ink: #e8ebf1; --muted: #9ba4b4; --grid: #2c3340;
+  --ideal: #6ea8f0; --real: #ff6b6b; --fire: #f0a24a;
+  --metal: #5a6474; --metal-2: #7c8696; --hatch: rgba(155,164,180,0.45);
+  --band-a: #252c38; --band-b: #1f252f; --line: #2f3744; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 20px 40px; display: grid; gap: 16px; }
+h1 { font: 700 30px/1.15 var(--font-display); margin: 0; text-wrap: balance; letter-spacing: 0.2px; }
+h2 { font: 700 18px/1.2 var(--font-display); margin: 0 0 8px; text-wrap: balance; }
+.lede { margin: 6px 0 0; color: var(--muted); max-width: 72ch; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+.group { display: flex; flex-direction: column; gap: 4px; }
+.group > span { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: 600 14px var(--font-body); color: var(--ink); background: var(--panel); border: 0; padding: 7px 14px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+#gModel button[data-v="ideal"][aria-pressed="true"] { background: var(--ideal); color: #fff; }
+#gModel button[data-v="real"][aria-pressed="true"] { background: var(--real); color: #fff; }
+.checks { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.checks label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.transport { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+.btn { font: 600 14px var(--font-body); padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--ink); color: var(--panel); min-width: 74px; }
+select { font: 14px var(--font-body); padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid var(--fire); outline-offset: 2px; }
+.stage { display: grid; grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.stage canvas { width: 100%; display: block; }
+.readout { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.readout div { background: var(--bg); border-radius: 8px; padding: 6px 10px; }
+.readout b { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.readout span { font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; }
+#scrub { width: 100%; margin: 8px 0 0; accent-color: var(--ink); }
+#tl { width: 100%; display: block; cursor: pointer; touch-action: none; }
+.now { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.now p { margin: 0; max-width: 60ch; }
+.now h2 { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.now .engine h2 { color: var(--ink); }
+#strokeName { font: 700 20px var(--font-display); display: block; margin-bottom: 4px; }
+.two { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+td { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); font-size: 12px; }
+th.i { color: var(--ideal); } th.r { color: var(--real); }
+ol.diffs { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+#beyond { border-left: 4px solid var(--line); }
+#beyond.lit { border-left-color: var(--fire); }
+#beyond p { margin: 0 0 8px; max-width: 72ch; }
+.note { font-size: 13px; color: var(--muted); max-width: 90ch; }
+a { color: var(--ideal); }
+@media (max-width: 860px) {
+  .stage, .now, .two { grid-template-columns: 1fr; }
+  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .transport { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav aria-label="Site" style="display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 10px;font-size:.95rem"><a href="./" style="color:var(--real)">← Exam prep</a><a href="cycles.html" style="color:var(--real)">Every cycle, animated (Thermo Cycle Quest) →</a></nav>
+  <header>
+    <h1>Otto and Diesel cycles in motion</h1>
+    <p class="lede">Watch the piston, valves, spark, and fuel spray move with the state point on the P-v diagram. Switch between the ideal air-standard cycle and a model of a real engine to see where the textbook loop and the engine part ways.</p>
+  </header>
+
+  <section class="card controls" aria-label="Controls">
+    <div class="group"><span>Cycle</span>
+      <div class="seg" id="gCycle"><button data-v="otto" aria-pressed="true">Otto</button><button data-v="diesel" aria-pressed="false">Diesel</button></div></div>
+    <div class="group"><span>Engine</span>
+      <div class="seg" id="gStroke"><button data-v="4" aria-pressed="true">4-stroke</button><button data-v="2" aria-pressed="false">2-stroke</button></div></div>
+    <div class="group"><span>Model</span>
+      <div class="seg" id="gModel"><button data-v="ideal" aria-pressed="true">Ideal</button><button data-v="real" aria-pressed="false">Real</button></div></div>
+    <div class="checks">
+      <label for="compare"><input type="checkbox" id="compare" checked> Show the other model on P-v</label>
+      <label for="logp"><input type="checkbox" id="logp"> Log pressure axis (shows the pumping loop)</label>
+    </div>
+    <div class="transport">
+      <button class="btn" id="back" aria-label="Step back 5 samples">◀ 5</button>
+      <button class="btn primary" id="play" aria-pressed="true">Pause</button>
+      <button class="btn" id="fwd" aria-label="Step forward 5 samples">5 ▶</button>
+      <label class="group" for="speed"><span>Speed</span>
+        <select id="speed"><option value="0.35">Slow</option><option value="1" selected>Normal</option><option value="2.2">Fast</option></select></label>
+    </div>
+  </section>
+
+  <section class="stage">
+    <div class="card"><canvas id="engine" role="img" aria-label="Cross-section of the engine: cylinder, piston, connecting rod, crank, valves or ports, and the gas colored by temperature"></canvas></div>
+    <div class="card">
+      <canvas id="pv" role="img" aria-label="Pressure-volume diagram with the cycle loop and the current state point"></canvas>
+      <div class="readout" aria-live="off">
+        <div><b>Stroke</b><span id="strokeName2"></span><span id="strokeNameHidden" hidden></span></div>
+        <div><b>Crank angle</b><span id="angle"></span></div>
+        <div><b>Volume</b><span id="vol"></span></div>
+        <div><b>Pressure</b><span id="pres"></span></div>
+        <div><b>Gas temperature</b><span id="temp"></span></div>
+      </div>
+      <input type="range" id="scrub" min="0" max="100" value="0" aria-label="Position in the cycle">
+    </div>
+  </section>
+
+  <section class="card" aria-label="Crank-angle timeline">
+    <canvas id="tl" role="img" aria-label="Timeline of one cycle by crank angle: strokes, valve or port open periods, and the spark or injection point. Click to jump."></canvas>
+  </section>
+
+  <section class="now">
+    <div class="card engine"><span id="strokeName"></span><h2>In the engine</h2><p id="eEngine"></p></div>
+    <div class="card"><h2>On the P-v diagram</h2><p id="ePv"></p></div>
+    <div class="card"><h2 id="diffLabel">How a real engine differs here</h2><p id="eDiff"></p></div>
+  </section>
+
+  <section class="two">
+    <div class="card">
+      <h2>One cycle, ideal vs. real</h2>
+      <table>
+        <thead><tr><th></th><th class="i">Ideal air-standard</th><th class="r">Real (model)</th></tr></thead>
+        <tbody id="numbers"></tbody>
+      </table>
+      <p class="note">Same engine (86 mm bore and stroke, about 500 cm³ per cylinder) and the same fuel energy per cycle in both columns. Real efficiency here is indicated efficiency: friction would lower it further.</p>
+    </div>
+    <div class="card">
+      <h2>Why the real loop is smaller</h2>
+      <ol class="diffs">
+        <li><b>Combustion takes time.</b> 40–60° of crank angle, so it starts before TDC and finishes after. The sharp top corners round off and the peak pressure drops.</li>
+        <li><b>Heat leaks to the walls.</b> Compression and expansion follow n ≈ 1.3 instead of k = 1.4.</li>
+        <li><b>Valves and ports don't switch at dead center.</b> Intake closes after BDC, exhaust opens before BDC (blowdown), and the bottom-right corner disappears.</li>
+        <li><b>Gas exchange costs work.</b> A four-stroke pulls in below atmospheric and pushes out above it, adding a negative pumping loop. A throttled Otto engine pays the most.</li>
+        <li><b>Real gases aren't cold air.</b> c_p and c_v rise with temperature, which lowers peak temperature and pressure further. This model keeps them constant.</li>
+        <li><b>Friction and blow-by</b> don't show on the P-v diagram, but they take their share between indicated and brake power.</li>
+      </ol>
+    </div>
+  </section>
+
+  <aside class="card" id="beyond">
+    <h2>Beyond the numbers: who breathes the short-circuit?</h2>
+    <p>In the crankcase-scavenged two-stroke (Otto, 2-stroke, Real), watch the green dots during scavenging: some fresh fuel–air mixture flows straight across the cylinder and out the exhaust port without burning. Small handheld equipment like backpack leaf blowers commonly uses this kind of engine.</p>
+    <p>California's Air Resources Board found that <a href="https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2021/sore21/CARB%20SORE%20FAQ%20(4).pdf">smog-forming emissions from small off-road engines already exceeded those from light-duty passenger cars in 2021</a>, and that one hour of a commercial leaf blower emits as much smog-forming pollution as driving a car about 1,100 miles. The people standing next to these engines all day are landscaping crews. Compare the uniflow diesel two-stroke: its scavenging loses only air, never fuel.</p>
+    <p class="note">Question for discussion: the engine is cheap, light, and simple, and those are real advantages. Who gets those benefits, and who pays the cost in what they breathe?</p>
+  </aside>
+
+  <p class="note">About the model. Ideal: cold-air-standard cycle, k = 1.4, P₁ = 1 bar, T₁ = 300 K, q_in = 1500 kJ/kg, r = 9 (Otto) or 17 (Diesel). Real: a single-zone model with a Wiebe heat-release curve (Otto: spark 20° before TDC, 55° burn; Diesel: injection 10° before TDC, a short premixed spike, then a 50° diffusion burn), polytropic n = 1.32 standing in for wall heat loss, 82% of the fuel energy reaching the gas, typical valve and port timing, and intake and exhaust pressures of 0.90 to 1.25 bar. The real curves are an illustrative model, not measured data. Gas temperature is shown only while the cylinder is closed. Keyboard: space plays or pauses, arrow keys step one sample.</p>
+</div>
+<script>
+// ---------------------------------------------------------------------------------------------
+// Physics for the Otto/Diesel engine animation. Pure functions, no DOM, so node can test them.
+// Ideal: cold-air-standard (k = 1.4), P1 = 1 bar, T1 = 300 K, q_in = 1500 kJ/kg.
+// Real: single-zone model, polytropic n = 1.32 (stands in for wall heat loss), Wiebe burn,
+// real valve/port timing, intake/exhaust pressures. Same fuel energy per cycle as the ideal cycle.
+// ---------------------------------------------------------------------------------------------
+const GEO = { B: 8.6, S: 8.6, a: 4.3, l: 14.5 };               // cm: bore, stroke, crank radius, rod
+GEO.A = Math.PI / 4 * GEO.B * GEO.B;                           // cm^2
+GEO.Vd = GEO.A * GEO.S;                                        // cm^3 (about 500)
+const AIR = { R: 287, cp: 1005, cv: 718, k: 1.4 };
+const RAD = Math.PI / 180;
+
+function pistonS(caDeg) {                                      // cm from TDC; caDeg = 0 at TDC
+  const t = caDeg * RAD, a = GEO.a, l = GEO.l;
+  return a * (1 - Math.cos(t)) + l - Math.sqrt(l * l - a * a * Math.sin(t) * Math.sin(t));
+}
+
+function makeConfig(cycle, strokes) {
+  const r = cycle === "otto" ? 9 : 17;
+  const Vc = GEO.Vd / (r - 1);
+  const c = { cycle, strokes, r, Vc, V1: GEO.Vd + Vc, qin: 1500e3, T1: 300, P1: 1.0 };
+  c.m = c.P1 * 1e5 * c.V1 * 1e-6 / (AIR.R * c.T1);             // kg of air (ideal reference)
+  c.Qin = c.m * c.qin;                                          // J per cycle of fuel energy
+  c.len = strokes === 4 ? 720 : 360;                            // cycle angle span
+  c.tdc = strokes === 4 ? 360 : 180;                            // firing TDC in cycle angle
+  // drawing crank angle (0 = TDC) from cycle angle
+  c.ca = strokes === 4 ? (th) => ((th % 360) + 360) % 360 : (th) => (((th + 180) % 360) + 360) % 360;
+  c.V = (th) => Vc + GEO.A * pistonS(c.ca(th));
+  // real timing, in cycle angle
+  if (strokes === 4) {
+    c.ev = { IVO: 710, IVC: 212, EVO: 495, EVC: 12 };
+    c.Pint = cycle === "otto" ? 0.90 : 0.97; c.Pexh = 1.12;
+  } else if (cycle === "otto") {                                // loop-scavenged, crankcase-compressed
+    c.ev = { EPO: 280, TPO: 300, TPC: 60, EPC: 80 };            // 100/120 deg after TDC; mirror before BDC... closes
+    c.Pscav = 1.08; c.Ptrap = 1.05; c.shortCircuit = 0.15;
+  } else {                                                      // uniflow: ports in, exhaust valves out
+    c.ev = { EVO: 275, IPO: 310, IPC: 50, EVC: 65 };
+    c.Pscav = 1.25; c.Ptrap = 1.15;
+  }
+  if (cycle === "otto") c.spark = c.tdc - 20; else { c.SOI = c.tdc - 10; c.EOI = c.tdc + 18; }
+  return c;
+}
+
+// ---------------------------------------------------------------- ideal cycle
+function idealStates(c) {
+  const k = AIR.k, r = c.r;
+  const s = { V1: c.V1, V2: c.Vc, P1: c.P1, T1: c.T1 };
+  s.T2 = c.T1 * Math.pow(r, k - 1); s.P2 = c.P1 * Math.pow(r, k);
+  if (c.cycle === "otto") {
+    s.T3 = s.T2 + c.qin / AIR.cv; s.P3 = s.P2 * s.T3 / s.T2; s.V3 = c.Vc;
+    s.T4 = s.T3 * Math.pow(1 / r, k - 1); s.P4 = c.P1 * s.T4 / c.T1;
+    s.eta = 1 - Math.pow(r, 1 - k);
+  } else {
+    s.T3 = s.T2 + c.qin / AIR.cp; s.P3 = s.P2; s.rc = s.T3 / s.T2; s.V3 = s.rc * c.Vc;
+    s.P4 = s.P3 * Math.pow(s.V3 / c.V1, k); s.T4 = c.T1 * s.P4 / c.P1;
+    s.eta = 1 - Math.pow(r, 1 - k) * (Math.pow(s.rc, k) - 1) / (k * (s.rc - 1));
+  }
+  return s;
+}
+
+// A sample: { th (cycle angle), V (cm3), P (bar), ph (phase key), xb (burned 0..1), hold (bool) }
+function idealTrack(c) {
+  const st = idealStates(c), k = AIR.k, out = [], T = c.tdc, L = c.len;
+  const push = (th, P, ph, xb, hold) => out.push({ th, V: c.V(th), P, ph, xb, hold: !!hold });
+  const HOLD_IN = c.cycle === "otto" ? 50 : 0, HOLD_OUT = 40;
+  const bdcPow = T + 180;                                       // BDC after the power stroke
+  if (c.strokes === 4) for (let th = 0; th < 180; th += 1) push(th, c.P1, "intake", 0);
+  const comp0 = c.strokes === 4 ? 180 : 0;
+  for (let th = comp0; th < T; th += 1) push(th, c.P1 * Math.pow(c.V1 / c.V(th), k), "compression", 0);
+  let thExp = T;
+  if (c.cycle === "otto") {
+    for (let i = 0; i <= HOLD_IN; i++) { const f = i / HOLD_IN; push(T, st.P2 + f * (st.P3 - st.P2), "heatin", f, true); }
+  } else {                                                      // constant P until V = V3
+    let th = T;
+    while (c.V(th) < st.V3) { push(th, st.P2, "heatin", (c.V(th) - c.Vc) / (st.V3 - c.Vc)); th += 0.5; }
+    thExp = th;
+  }
+  for (let th = thExp; th <= bdcPow; th += 1) {
+    const P = c.cycle === "otto" ? st.P3 * Math.pow(c.Vc / c.V(th), k) : st.P3 * Math.pow(st.V3 / c.V(th), k);
+    push(th, P, "expansion", 1);
+  }
+  for (let i = 1; i <= HOLD_OUT; i++) { const f = i / HOLD_OUT; push(bdcPow, st.P4 + f * (c.P1 - st.P4), "heatout", 1, true); }
+  if (c.strokes === 4) for (let th = 541; th < 720; th += 1) push(th, c.P1, "exhaust", 1);
+  return { samples: out, states: st };
+}
+
+// ---------------------------------------------------------------- real cycle
+function wiebe(th, start, dur, m) {
+  if (th <= start) return 0;
+  const x = (th - start) / dur;
+  return 1 - Math.exp(-5 * Math.pow(x, m + 1));
+}
+function burnFrac(c, th) {
+  if (c.cycle === "otto") return wiebe(th, c.spark, 55, 2);
+  return 0.2 * wiebe(th, c.tdc - 1, 8, 2) + 0.8 * wiebe(th, c.tdc + 1, 50, 1);
+}
+const N_REAL = 1.32, HEAT_FRACTION = 0.82;   // n stands in for wall heat loss; 18% lost to walls/incomplete burn
+
+function closedPressure(c, thc, tho, Ptrap) {   // integrate from closing to opening; returns Map-like array
+  const h = 0.25, n = N_REAL, Qb = c.Qin * HEAT_FRACTION * (c.shortCircuit ? 1 - c.shortCircuit : 1);
+  const res = []; let P = Ptrap * 1e5;
+  for (let th = thc; th <= tho + 1e-9; th += h) {
+    res.push([th, P / 1e5]);
+    const V1 = c.V(th) * 1e-6, V2 = c.V(th + h) * 1e-6, dQ = Qb * (burnFrac(c, th + h) - burnFrac(c, th));
+    P = P * Math.pow(V1 / V2, n) + (n - 1) * dQ / (0.5 * (V1 + V2));
+  }
+  return res;
+}
+function lookup(arr, th) {                      // arr sorted by th, step 0.25
+  const i = Math.round((th - arr[0][0]) / 0.25);
+  return arr[Math.max(0, Math.min(arr.length - 1, i))][1];
+}
+
+function realTrack(c) {
+  const out = [], L = c.len, T = c.tdc;
+  let closed, thc, tho;
+  if (c.strokes === 4) {
+    thc = c.ev.IVC; tho = c.ev.EVO;
+    const Ptrap = c.Pint + 0.03;
+    closed = closedPressure(c, thc, tho, Ptrap);
+    const Po = lookup(closed, tho);
+    for (let th = 0; th < L; th += 1) {
+      let P;
+      if (th >= thc && th <= tho) P = lookup(closed, th);
+      else if (th > tho) P = c.Pexh + (Po - c.Pexh) * Math.exp(-(th - tho) / 14)
+                             + (th > 540 ? 0.04 * Math.sin(Math.PI * (th - 540) / 180) : 0);
+      else if (th < 180) P = c.Pint + (c.Pexh - c.Pint) * Math.exp(-th / 10);
+      else P = c.Pint + 0.03 * (th - 180) / (thc - 180);
+      out.push({ th, V: c.V(th), P, ph: realPhase(c, th), xb: realXb(c, th), hold: false });
+    }
+  } else {
+    thc = c.cycle === "otto" ? c.ev.EPC : c.ev.EVC; tho = c.cycle === "otto" ? c.ev.EPO : c.ev.EVO;
+    closed = closedPressure(c, thc, tho, c.Ptrap);
+    const Po = lookup(closed, tho);
+    for (let th = 0; th < L; th += 1) {
+      let P;
+      if (th >= thc && th <= tho) P = lookup(closed, th);
+      else if (th > tho) P = c.Pscav + (Po - c.Pscav) * Math.exp(-(th - tho) / 10);
+      else P = c.Pscav + (c.Ptrap - c.Pscav) * th / thc;
+      out.push({ th, V: c.V(th), P, ph: realPhase(c, th), xb: realXb(c, th), hold: false });
+    }
+  }
+  return { samples: out, closedFrom: thc, closedTo: tho };
+}
+function realXb(c, th) {
+  const L = c.len;
+  const open = c.strokes === 4 ? (th > c.ev.EVO || th < c.ev.IVC) : (th > (c.cycle === "otto" ? c.ev.EPO : c.ev.EVO) ||
+                                                                       th < (c.cycle === "otto" ? c.ev.EPC : c.ev.EVC));
+  if (c.strokes === 4 && th < c.ev.IVC) return 0;
+  if (c.strokes === 2 && th < (c.cycle === "otto" ? c.ev.EPC : c.ev.EVC)) return 0;
+  if (open) return 1;
+  return burnFrac(c, th);
+}
+function realPhase(c, th) {
+  const T = c.tdc, ev = c.ev;
+  const burnEnd = c.cycle === "otto" ? c.spark + 55 : T + 50;
+  const fire = c.cycle === "otto" ? c.spark : c.SOI;
+  if (c.strokes === 4) {
+    if (th >= ev.IVO || th < ev.EVC) return "overlap";
+    if (th < 180) return "intake";
+    if (th < ev.IVC) return "lateintake";
+    if (th < fire) return "compression";
+    if (c.cycle === "diesel" && th < T - 1) return "delay";
+    if (c.cycle === "otto" && th < T) return "advance";
+    if (th < burnEnd) return "combustion";
+    if (th < ev.EVO) return "expansion";
+    if (th < 540) return "blowdown";
+    return "exhaust";
+  }
+  if (c.cycle === "otto") {
+    if (th < ev.TPC) return "scavenge";
+    if (th < ev.EPC) return "spillback";
+    if (th < fire) return "compression";
+    if (th < T) return "advance";
+    if (th < burnEnd) return "combustion";
+    if (th < ev.EPO) return "expansion";
+    if (th < ev.TPO) return "blowdown";
+    return "scavenge";
+  }
+  if (th < ev.IPC) return "scavenge";
+  if (th < ev.EVC) return "spillback";
+  if (th < fire) return "compression";
+  if (th < T - 1) return "delay";
+  if (th < burnEnd) return "combustion";
+  if (th < ev.EVO) return "expansion";
+  if (th < ev.IPO) return "blowdown";
+  return "scavenge";
+}
+
+function loopWork(samples) {                    // closed-loop integral of P dV, in J (P bar, V cm3)
+  let W = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const a = samples[i], b = samples[(i + 1) % samples.length];
+    W += 0.5 * (a.P + b.P) * (b.V - a.V) * 0.1;
+  }
+  return W;
+}
+
+if (typeof module !== "undefined") module.exports = { GEO, makeConfig, idealTrack, realTrack, loopWork, idealStates, pistonS };
+
+</script>
+<script>
+// ---------------------------------------------------------------------------------------------
+// Drawing, animation, and controls. Uses physics.js (inlined above this script in the page).
+// ---------------------------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const S = { cycle: "otto", strokes: 4, model: "ideal", compare: true, logP: false, playing: true, speed: 1, pos: 0 };
+let C, ID, RE, TRACK, OTHER, METRICS;
+const RATE = 80;                 // samples per second at 1x (about 9 s per four-stroke cycle)
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function mixRGB(c1, c2, t) { return c1.map((v, i) => Math.round(lerp(v, c2[i], clamp(t, 0, 1)))); }
+function rgb(c, a = 1) { return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+
+// ------------------------------------------------------------------ build tracks for the current setup
+function build() {
+  C = makeConfig(S.cycle, S.strokes);
+  ID = idealTrack(C);
+  RE = realTrack(C);
+  TRACK = S.model === "ideal" ? ID.samples : RE.samples;
+  OTHER = S.model === "ideal" ? RE.samples : ID.samples;
+  const Wi = loopWork(ID.samples), Wr = loopWork(RE.samples);
+  const peakR = Math.max(...RE.samples.map((x) => x.P));
+  METRICS = { Wi, Wr, peakI: ID.states.P3, peakR, etaI: ID.states.eta, etaR: Wr / C.Qin,
+              imepI: Wi / (GEO.Vd * 1e-6) / 1e5, imepR: Wr / (GEO.Vd * 1e-6) / 1e5 };
+  S.pos = 0;
+  $("scrub").max = TRACK.length - 1;
+  renderNumbers();
+  renderBeyond();
+}
+
+// ------------------------------------------------------------------ text
+const STROKE4 = ["Intake stroke", "Compression stroke", "Power stroke", "Exhaust stroke"];
+function strokeName(s) {
+  if (C.strokes === 4) return STROKE4[clamp(Math.floor(s.th / 180), 0, 3)];
+  return s.th < 180 || (s.th === 180 && s.ph !== "expansion") ? "Upstroke (compression)" : "Downstroke (power)";
+}
+function angleText(s) {
+  const d = s.th - C.tdc;
+  const ca = C.ca(s.th);
+  let rel;
+  if (Math.abs(d) < 0.5 || Math.abs(Math.abs(d) - C.len) < 0.5) rel = "at TDC";
+  else if (Math.abs(ca - 180) < 0.5) rel = "at BDC";
+  else if (C.strokes === 4) {
+    const dd = ((s.th - 360 + 720) % 720);
+    const tdcs = [0, 360, 720];
+    let best = tdcs.reduce((b, t) => Math.abs(s.th - t) < Math.abs(s.th - b) ? t : b, 0);
+    const off = s.th - best;
+    rel = off < 0 ? `${Math.round(-off)}° before TDC` : `${Math.round(off)}° after TDC`;
+    if (Math.abs(off) > 90) { const b2 = s.th < 360 ? 180 : 540; const o2 = s.th - b2; rel = o2 < 0 ? `${Math.round(-o2)}° before BDC` : `${Math.round(o2)}° after BDC`; }
+  } else {
+    const off = s.th - 180;
+    if (Math.abs(off) <= 90) rel = off < 0 ? `${Math.round(-off)}° before TDC` : `${Math.round(off)}° after TDC`;
+    else { const o2 = s.th < 180 ? s.th : s.th - 360; rel = o2 < 0 ? `${Math.round(-o2)}° before BDC` : `${Math.round(o2)}° after BDC`; }
+  }
+  return rel;
+}
+
+function explain(s) {
+  const otto = C.cycle === "otto", four = C.strokes === 4, ideal = S.model === "ideal";
+  const charge = otto ? "fuel–air mixture" : "air only (no fuel yet)";
+  const st = ID.states;
+  const f1 = (x) => x.toFixed(1);
+  const E = {};
+  if (ideal) {
+    switch (s.ph) {
+      case "intake": E.engine = `Intake valve open, piston moving down. The cylinder fills with ${charge}.`;
+        E.pv = `Horizontal line at P₁ = ${f1(st.P1)} bar from TDC to BDC (state 0 → 1). The air-standard cycle leaves it out: this line and the exhaust line cancel.`;
+        E.diff = `A real engine pulls its charge in below atmospheric pressure${otto ? ", much lower when the throttle is partly closed" : ""}. That costs pumping work.`; break;
+      case "compression": E.engine = `${four ? "Both valves closed. " : "Ports covered. "}The piston rises and squeezes the ${otto ? "mixture" : "air"} into the ${f1(C.Vc)} cm³ clearance volume (r = ${C.r}).`;
+        E.pv = `1 → 2: isentropic compression, Pv^k = constant with k = 1.4. P rises from ${f1(st.P1)} to ${f1(st.P2)} bar; T from ${Math.round(st.T1)} to ${Math.round(st.T2)} K.`;
+        E.diff = four ? "Real compression starts late (the intake valve closes about 30° after BDC) and loses heat to the walls, so n ≈ 1.3, not 1.4."
+                      : "In a real two-stroke, compression only starts when the ports are covered, well after BDC, so the effective compression ratio is lower.";
+        if (!otto) E.diff += ` Diesel needs r = ${C.r}: the air must end up hotter than the fuel's autoignition temperature (T₂ = ${Math.round(st.T2)} K here).`; break;
+      case "heatin":
+        if (otto) { E.engine = "Spark at TDC. The ideal model burns the whole charge instantly, so the piston doesn't move while the pressure jumps.";
+          E.pv = `2 → 3: constant-volume heat addition, q_in = c_v(T₃ − T₂). Pressure jumps from ${f1(st.P2)} to ${f1(st.P3)} bar at v₂.`;
+          E.diff = `A real flame takes 40–60° of crank angle, so the spark fires about 20° before TDC and the top corner is rounded. Real peak here: ${f1(METRICS.peakR)} bar, not ${f1(st.P3)}.`; }
+        else { E.engine = "Fuel is sprayed in at TDC and burns as fast as the piston moves away, so the pressure stays constant while the volume grows.";
+          E.pv = `2 → 3: constant-pressure heat addition, q_in = c_p(T₃ − T₂), from v₂ to the cutoff volume v₃ = r_c·v₂ (r_c = ${st.rc.toFixed(2)}).`;
+          E.diff = "A real diesel has an ignition delay, then a fast premixed burn (a pressure spike), then slower diffusion burning. The top is neither flat nor vertical."; }
+        break;
+      case "expansion": E.engine = "Hot gas pushes the piston down: the power stroke. This is where the work comes from.";
+        E.pv = `3 → 4: isentropic expansion, k = 1.4. Pressure falls to ${f1(st.P4)} bar at BDC.`;
+        E.diff = `Real expansion loses heat to the walls (n ≈ 1.3), and the ${four ? "exhaust valve" : (otto ? "exhaust port" : "exhaust valve")} opens before BDC, cutting the stroke short.`; break;
+      case "heatout": E.engine = four ? "Exhaust valve opens at BDC. The ideal model replaces the rush of exhaust (blowdown) with heat rejected at constant volume."
+                                      : "Ports uncovered at BDC. The ideal model squeezes all of the gas exchange into this instant: heat rejected at constant volume, fresh charge in.";
+        E.pv = `4 → 1: constant-volume heat rejection, q_out = c_v(T₄ − T₁), back to P₁.`;
+        E.diff = "In a real engine the exhaust opens about 45° before BDC, so the bottom-right corner of the loop is cut off."; break;
+      case "exhaust": E.engine = "Exhaust valve open. The piston pushes the burned gas out.";
+        E.pv = `1 → 0: back along the P₁ line to TDC, retracing the intake line.`;
+        E.diff = "Real exhaust leaves above atmospheric pressure. With the intake below it, the result is a small negative pumping loop. Turn on the log scale to see it."; break;
+    }
+    return E;
+  }
+  const evN = four ? "valve" : "port";
+  switch (s.ph) {
+    case "overlap": E.engine = "Valve overlap: around TDC both valves are slightly open, so the outgoing exhaust helps pull in fresh charge.";
+      E.pv = "Pressure near atmospheric at minimum volume: the pumping loop closes here."; break;
+    case "intake": E.engine = otto ? "Intake valve open, piston moving down. The partly closed throttle restricts the flow, so cylinder pressure sits below atmospheric."
+                                    : "Intake valve open, piston moving down. A diesel has no throttle, so pressure stays close to atmospheric.";
+      E.pv = `Bottom edge of the pumping loop, at about ${C.Pint.toFixed(2)} bar.`; break;
+    case "lateintake": E.engine = "The piston has passed BDC and is rising, but the intake valve stays open about 30° longer. The moving charge keeps filling the cylinder.";
+      E.pv = "Volume shrinks while pressure barely changes: compression hasn't really started yet."; break;
+    case "spillback": E.engine = otto ? "Transfer ports covered, but the exhaust port is still open. The rising piston pushes some fresh mixture back out."
+                                      : "Intake ports covered, exhaust valves still open for a few more degrees.";
+      E.pv = "Volume shrinks with pressure near the scavenge pressure. Real compression starts only when everything is closed."; break;
+    case "scavenge": E.engine = otto ? "Transfer ports open: fresh mixture squeezed in the crankcase loops up the far wall and pushes exhaust out the exhaust port. Some fresh mixture short-circuits straight out: unburned fuel."
+                                     : "Intake ports in the cylinder wall are open. A blower pushes air in from the bottom and sweeps exhaust up through the valves in the head (uniflow). Only air escapes, never fuel.";
+      E.pv = `Near BDC at about ${C.Pscav.toFixed(2)} bar: the gas exchange that the ideal model treats as one instant of heat rejection.`; break;
+    case "compression": E.engine = four ? "Valves closed, piston rising." : (otto ? "Ports covered, piston rising. Below the piston, the crankcase draws in fresh mixture through a reed valve." : "Ports and valves closed, piston rising.");
+      E.pv = "Polytropic compression with n ≈ 1.3: heat leaks to the cooler walls, so the curve sits a little below the ideal isentrope."; break;
+    case "advance": E.engine = "The spark fires 20° before TDC and a flame front spreads across the chamber.";
+      E.pv = "Pressure rises above the compression curve before TDC: combustion starts while the piston is still rising."; break;
+    case "delay": E.engine = "Fuel spray starts 10° before TDC. It takes a few degrees to vaporize, mix with the hot air, and ignite on its own (ignition delay).";
+      E.pv = "No pressure rise yet: the spray is still mixing."; break;
+    case "combustion": E.engine = otto ? "The flame finishes burning the charge as the piston starts down."
+                                       : "The fuel that mixed during the delay burns all at once (a pressure spike), then the rest burns as it's injected and mixes (diffusion flame).";
+      E.pv = `Rounded top: heat is released over about 50° of crank angle, partly while the volume grows. Peak ${METRICS.peakR.toFixed(1)} bar, against ${ID.states.P3.toFixed(1)} bar in the ideal cycle.`; break;
+    case "expansion": E.engine = "Power stroke: burned gas pushes the piston down.";
+      E.pv = "Polytropic expansion, n ≈ 1.3. Heat lost to the walls lowers the pressure compared with the ideal isentrope."; break;
+    case "blowdown": E.engine = four ? "The exhaust valve opens about 45° before BDC and hot gas rushes out on its own (blowdown)."
+                                     : (otto ? "The piston uncovers the exhaust port first, and hot gas rushes out (blowdown) before the transfer ports open."
+                                             : "The exhaust valves open first, and hot gas rushes out (blowdown) before the intake ports open.");
+      E.pv = "Pressure drops fast before BDC: the rounded bottom-right corner. A little expansion work is traded for an easier exhaust."; break;
+    case "exhaust": E.engine = "The piston pushes the remaining exhaust out against the back-pressure in the exhaust system.";
+      E.pv = `Top edge of the pumping loop, at about ${C.Pexh.toFixed(2)} bar. Intake below, exhaust above: the pumping loop runs counterclockwise and subtracts work.`; break;
+  }
+  E.diff = realDiff(s);
+  return E;
+}
+function realDiff(s) {
+  const otto = C.cycle === "otto";
+  const map = {
+    overlap: "The ideal cycle switches valves exactly at TDC and BDC. Real timing is spread out to help the gas flow.",
+    intake: "Ideal intake is at exactly 1 bar. Here it's lower, so the engine does work pulling the charge in.",
+    lateintake: "The ideal compression starts at BDC. Here it starts at intake-valve closing, so less of the stroke compresses.",
+    spillback: "The ideal model starts compression at BDC. A real two-stroke starts only after the ports close.",
+    scavenge: otto ? "Ideal: instant constant-volume heat rejection at BDC. Real: blowdown, then scavenging, with some fuel lost out the exhaust." : "Ideal: instant constant-volume heat rejection at BDC. Real: blowdown, then scavenging with blower air.",
+    compression: "Ideal uses k = 1.4 with no heat loss; the real curve uses n = 1.32.",
+    advance: "Ideal Otto burns at TDC instantly. Real combustion has to start early to finish near TDC.",
+    delay: "Ideal Diesel starts burning exactly at TDC. Real fuel needs time to ignite.",
+    combustion: otto ? "Ideal: vertical line at v₂. Real: a rounded hump that peaks about 15° after TDC." : "Ideal: flat line at P₂. Real: a spike from the premixed burn, then a gentle decline.",
+    expansion: "Same shape as the ideal isentrope, but lower: heat has gone to the walls.",
+    blowdown: "Ideal: the exhaust opens at BDC (state 4). Real: it opens early, so state 4 never quite happens.",
+    exhaust: "Ideal exhaust is at exactly 1 bar. Real exhaust is above it, which adds to the pumping loss.",
+  };
+  return map[s.ph] || "";
+}
+
+function renderNow(s) {
+  const E = explain(s);
+  $("strokeName").textContent = strokeName(s); $("strokeName2").textContent = strokeName(s).replace(" stroke", "");
+  $("angle").textContent = `${Math.round(s.th)}° (${angleText(s)})`;
+  $("vol").textContent = `${s.V.toFixed(1)} cm³`;
+  $("pres").textContent = `${s.P.toFixed(s.P < 10 ? 2 : 1)} bar`;
+  const closed = S.model === "ideal" ? !["intake", "exhaust"].includes(s.ph)
+                                     : (s.th >= RE.closedFrom && s.th <= RE.closedTo);
+  $("temp").textContent = closed ? `${Math.round(gasT(s))} K` : "gas exchange";
+  $("eEngine").textContent = E.engine || "";
+  $("ePv").textContent = E.pv || "";
+  $("eDiff").textContent = E.diff || "";
+  $("diffLabel").textContent = S.model === "ideal" ? "How a real engine differs here" : "How the ideal cycle differs here";
+}
+
+function gasT(s) { return s.P * 1e5 * s.V * 1e-6 / (C.m * 287); }
+
+function renderNumbers() {
+  const m = METRICS, st = ID.states, f = (x, d = 1) => x.toFixed(d);
+  const etaFormula = C.cycle === "otto" ? `1 − 1/r^(k−1)` : `1 − (1/r^(k−1))·[(r_c^k − 1)/(k(r_c − 1))]`;
+  $("numbers").innerHTML = `
+    <tr><th scope="row">Compression ratio</th><td colspan="2">r = ${C.r}${C.cycle === "diesel" ? `, cutoff ratio r_c = ${st.rc.toFixed(2)} (ideal)` : ""}</td></tr>
+    <tr><th scope="row">Fuel energy per cycle</th><td colspan="2">${f(C.Qin, 0)} J (q_in = 1500 kJ/kg of air)${C.shortCircuit && S.model === "real" ? `; ${Math.round(C.shortCircuit * 100)}% lost unburned out the exhaust in the real two-stroke` : ""}</td></tr>
+    <tr><th scope="row">Peak pressure</th><td>${f(m.peakI)} bar</td><td>${f(m.peakR)} bar</td></tr>
+    <tr><th scope="row">Net work per cycle</th><td>${f(m.Wi, 0)} J</td><td>${f(m.Wr, 0)} J</td></tr>
+    <tr><th scope="row">Thermal efficiency</th><td>${f(100 * m.etaI)}% <span class="muted">= ${etaFormula}</span></td><td>${f(100 * m.etaR)}% <span class="muted">(indicated)</span></td></tr>
+    <tr><th scope="row">Mean effective pressure</th><td>${f(m.imepI, 2)} bar</td><td>${f(m.imepR, 2)} bar</td></tr>
+    <tr><th scope="row">Power strokes per revolution</th><td colspan="2">${C.strokes === 4 ? "½ (one every two revolutions)" : "1 (every revolution)"}</td></tr>`;
+}
+function renderBeyond() { $("beyond").classList.toggle("lit", C.strokes === 2 && C.cycle === "otto"); }
+
+// ------------------------------------------------------------------ canvas setup
+function fit(canvas, w, h) {
+  const dpr = window.devicePixelRatio || 1, cw = canvas.clientWidth, ch = cw * h / w;
+  canvas.style.height = ch + "px";
+  if (canvas.width !== Math.round(cw * dpr)) { canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr); }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(canvas.width / w, 0, 0, canvas.height / h, 0, 0);
+  return ctx;
+}
+
+// ------------------------------------------------------------------ engine drawing
+const EW = 420, EH = 650, K = 17.44;            // px per cm
+const XC = 210, YH = 132, PISTON = 64, PIN = 30, BORE = GEO.B * K;
+function valveLift(which, s) {                    // 0..1
+  const ideal = S.model === "ideal", th = s.th;
+  if (C.strokes === 4) {
+    if (ideal) {
+      if (which === "in") return s.ph === "intake" ? 1 : 0;
+      return s.ph === "exhaust" || s.ph === "heatout" ? 1 : 0;
+    }
+    const prof = (open, close) => { const dur = (close - open + 720) % 720, u = ((th - open + 720) % 720) / dur; return u >= 0 && u <= 1 ? Math.pow(Math.sin(Math.PI * u), 1.3) : 0; };
+    return which === "in" ? prof(C.ev.IVO, C.ev.IVC) : prof(C.ev.EVO, C.ev.EVC);
+  }
+  if (C.cycle === "diesel" && which === "ex") {
+    if (ideal) return s.ph === "heatout" ? 1 : 0;
+    const dur = (C.ev.EVC - C.ev.EVO + 360) % 360, u = ((th - C.ev.EVO + 360) % 360) / dur;
+    return u >= 0 && u <= 1 ? Math.pow(Math.sin(Math.PI * u), 1.3) : 0;
+  }
+  return 0;
+}
+function portTop(caDeg) { return YH + C.Vc / GEO.A * K + pistonS(caDeg) * K; }
+
+const COL = {
+  freshOtto: [120, 200, 170], air: [160, 200, 235], cool: [150, 165, 190], warm: [235, 170, 70], hot: [225, 70, 40],
+  exhaust: [150, 135, 120], flame: [255, 190, 60],
+};
+function tempColor(T) {
+  if (T < 900) return mixRGB(COL.cool, COL.warm, (T - 300) / 600);
+  return mixRGB(COL.warm, COL.hot, (T - 900) / 1400);
+}
+function gasFill(s) {
+  const fresh = C.cycle === "otto" ? COL.freshOtto : COL.air;
+  const T = gasT(s), ph = s.ph, ideal = S.model === "ideal";
+  if (["intake", "overlap", "lateintake", "scavenge", "spillback"].includes(ph)) return ph === "overlap" ? mixRGB(fresh, COL.exhaust, 0.35) : fresh;
+  if (ph === "exhaust") return COL.exhaust;
+  if (ph === "heatout") { const f = TRACK.indexOf(s); return C.strokes === 4 ? mixRGB(tempColor(T), COL.exhaust, 0.6) : mixRGB(COL.exhaust, fresh, 0.5); }
+  if (ph === "blowdown") return mixRGB(tempColor(T), COL.exhaust, 0.55);
+  if (s.xb <= 0.001) return mixRGB(fresh, tempColor(T), clamp((T - 300) / 900, 0, 0.7));
+  if (s.xb >= 0.999) return tempColor(T);
+  return mixRGB(mixRGB(fresh, COL.warm, 0.4), tempColor(T), s.xb);
+}
+
+function arrowChain(ctx, pts, color, t, n = 3) {     // animated chevrons along a polyline
+  let L = 0; const seg = [];
+  for (let i = 0; i < pts.length - 1; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); seg.push(d); L += d; }
+  ctx.fillStyle = color;
+  for (let j = 0; j < n; j++) {
+    let d = ((t * 60 + j * L / n) % L), i = 0;
+    while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
+    const a = pts[i], b = pts[i + 1], u = d / seg[i];
+    const x = lerp(a[0], b[0], u), y = lerp(a[1], b[1], u), ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-5, -6); ctx.lineTo(-2, 0); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawEngine(s, time) {
+  const ctx = fit($("engine"), EW, EH);
+  const ink = css("--ink"), muted = css("--muted"), metal = css("--metal"), metal2 = css("--metal-2"), bg = css("--panel");
+  const ideal = S.model === "ideal", otto = C.cycle === "otto", four = C.strokes === 4;
+  ctx.clearRect(0, 0, EW, EH);
+  const hc = C.Vc / GEO.A * K, ca = C.ca(s.th), sp = pistonS(ca) * K;
+  const yPist = YH + hc + sp, xL = XC - BORE / 2, xR = XC + BORE / 2, yBDC = YH + hc + GEO.S * K;
+  const wallBot = yBDC + PISTON + 8, yc = YH + hc + PIN + (GEO.l + GEO.a) * K, rc = GEO.a * K;
+  const lw = 12;                                       // wall thickness
+
+  // crankcase
+  ctx.fillStyle = metal2; ctx.strokeStyle = muted; ctx.lineWidth = 1.5;
+  roundRect(ctx, XC - 135, wallBot - 6, 270, yc + rc + 34 - (wallBot - 6), 18); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = bg; roundRect(ctx, XC - 123, wallBot + 4, 246, yc + rc + 22 - (wallBot + 4), 12); ctx.fill();
+
+  // gas
+  ctx.fillStyle = rgb(gasFill(s));
+  ctx.fillRect(xL, YH, BORE, yPist - YH);
+  // Diesel piston bowl gas
+  const bowlW = 70, bowlD = 16;
+  if (!otto) { ctx.beginPath(); ctx.ellipse(XC, yPist, bowlW / 2, bowlD, 0, 0, Math.PI); ctx.fill(); }
+
+  // flame / spray
+  const burning = (ideal && s.ph === "heatin") || (!ideal && s.xb > 0.002 && s.xb < 0.995 && !["blowdown", "scavenge"].includes(s.ph));
+  if (otto && burning) {
+    ctx.save(); ctx.beginPath(); ctx.rect(xL, YH, BORE, yPist - YH); ctx.clip();
+    const maxR = Math.hypot(BORE / 2, yPist - YH) + 4, R = Math.sqrt(s.xb) * maxR;
+    const g = ctx.createRadialGradient(XC, YH, 0, XC, YH, Math.max(R, 1));
+    g.addColorStop(0, rgb(COL.hot, 0.95)); g.addColorStop(0.85, rgb(COL.flame, 0.95)); g.addColorStop(1, rgb(COL.flame, 0.2));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(XC, YH, R, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+  const injecting = !otto && ((ideal && s.ph === "heatin") || (!ideal && s.th >= C.SOI && s.th <= C.EOI));
+  if (!otto && (injecting || (burning && !ideal))) {
+    const reach = injecting ? clamp((ideal ? s.xb * 3 : (s.th - C.SOI) / 4), 0.2, 1) : 1;
+    const lit = ideal ? 1 : clamp(s.xb * 4, 0, 1);
+    for (const dir of [-1, 1]) {
+      const tx = XC + dir * (bowlW / 2 + 6) * reach, ty = yPist + bowlD * 0.6 * reach;
+      ctx.beginPath(); ctx.moveTo(XC, YH + 4);
+      ctx.lineTo(tx - 5, ty - 4); ctx.lineTo(tx + 5 * dir, ty + 4); ctx.closePath();
+      ctx.fillStyle = lit > 0.05 ? rgb(mixRGB([210, 225, 240], COL.flame, lit), 0.9) : "rgba(225,235,245,0.95)"; ctx.fill();
+      if (lit > 0.05) { ctx.beginPath(); ctx.arc(tx, ty, 9 + 8 * lit, 0, Math.PI * 2); ctx.fillStyle = rgb(COL.flame, 0.35 * lit); ctx.fill(); }
+    }
+  }
+  // spark
+  const sparking = otto && ((ideal && s.ph === "heatin" && s.xb < 0.25) || (!ideal && s.th >= C.spark && s.th < C.spark + 5));
+  if (sparking) { ctx.strokeStyle = "#fff8c0"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(XC - 6, YH + 2); ctx.lineTo(XC + 2, YH + 8); ctx.lineTo(XC - 3, YH + 12); ctx.lineTo(XC + 6, YH + 18); ctx.stroke();
+    ctx.fillStyle = "rgba(255,240,150,0.5)"; ctx.beginPath(); ctx.arc(XC, YH + 10, 14, 0, Math.PI * 2); ctx.fill(); }
+
+  // cylinder walls (with ports for two-strokes)
+  ctx.fillStyle = metal;
+  const wall = (x, y0, y1) => ctx.fillRect(x, y0, lw, y1 - y0);
+  if (four) { wall(xL - lw, YH, wallBot); wall(xR, YH, wallBot); }
+  else if (otto) {
+    const ex = portTop(100), tp = portTop(120);
+    wall(xL - lw, YH, tp); wall(xL - lw, yBDC + 2, wallBot); wall(xR, YH, ex); wall(xR, yBDC + 2, wallBot);
+    // exhaust duct (right) and transfer channel (left, from crankcase)
+    ctx.fillStyle = metal2;
+    ctx.fillRect(xR + lw, ex - 6, 70, 6); ctx.fillRect(xR + lw, yBDC + 2, 70, 6);
+    ctx.fillRect(xL - lw - 30, tp - 6, 30, 6); ctx.fillRect(xL - lw - 30, tp - 6, 6, wallBot - tp + 6);
+    label(ctx, "exhaust port", xR + lw + 4, ex - 12, muted);
+    label(ctx, "transfer", xL - lw - 68, tp - 12, muted); label(ctx, "port", xL - lw - 68, tp + 2, muted);
+    if (ideal && s.ph !== "heatout") { ctx.fillStyle = css("--hatch"); ctx.fillRect(xR, ex, lw, yBDC + 2 - ex); ctx.fillRect(xL - lw, tp, lw, yBDC + 2 - tp); }
+    // reed valve at crankcase
+    label(ctx, "reed valve", XC - 210, wallBot + 40, muted);
+    ctx.fillStyle = metal2; ctx.fillRect(XC - 160, wallBot + 46, 37, 6);
+  } else {
+    const ip = portTop(130);
+    wall(xL - lw, YH, ip); wall(xL - lw, yBDC + 2, wallBot); wall(xR, YH, ip); wall(xR, yBDC + 2, wallBot);
+    ctx.strokeStyle = muted; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3]);
+    ctx.strokeRect(xL - lw - 34, ip - 10, BORE + 2 * lw + 68, yBDC - ip + 22); ctx.setLineDash([]);
+    label(ctx, "air box (blower)", xL - lw - 34, ip - 16, muted);
+    if (ideal && s.ph !== "heatout") { ctx.fillStyle = css("--hatch"); ctx.fillRect(xL - lw, ip, lw, yBDC + 2 - ip); ctx.fillRect(xR, ip, lw, yBDC + 2 - ip); }
+  }
+
+  // head
+  ctx.fillStyle = metal; roundRect(ctx, xL - lw - 22, YH - 58, BORE + 2 * lw + 44, 58, 8); ctx.fill();
+  const valves = four ? [["in", XC - 38], ["ex", XC + 38]] : (!otto ? [["ex", XC - 36], ["ex", XC + 36]] : []);
+  for (const [which, vx] of valves) {
+    const lift = valveLift(which, s) * 12, col = which === "in" ? css("--ideal") : css("--real");
+    ctx.fillStyle = bg; ctx.fillRect(vx - 15, YH - 58, 30, 52);                                       // port passage
+    ctx.fillStyle = metal2; ctx.fillRect(vx - 2.5, YH - 80, 5, 72 + lift);                           // stem
+    ctx.beginPath(); ctx.moveTo(vx - 17, YH - 2 + lift); ctx.lineTo(vx + 17, YH - 2 + lift); ctx.lineTo(vx + 4, YH - 10 + lift); ctx.lineTo(vx - 4, YH - 10 + lift); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = col; ctx.fillRect(vx - 6, YH - 86, 12, 6);                                        // color tag
+  }
+  if (four) { label(ctx, "intake valve", XC - 92, YH - 66, css("--ideal")); label(ctx, "exhaust valve", XC + 20, YH - 66, css("--real")); }
+  if (!four && !otto) label(ctx, "exhaust valves", XC - 40, YH - 92, css("--real"));
+  // spark plug or injector
+  ctx.fillStyle = metal2;
+  if (otto) { ctx.fillRect(XC - 6, YH - 74, 12, 70); ctx.fillStyle = css("--muted"); ctx.fillRect(XC - 1.5, YH - 4, 3, 6); label(ctx, "spark plug", XC + 10, YH - 78, muted); }
+  else { ctx.fillRect(XC - 5, YH - 74, 10, 72); ctx.beginPath(); ctx.moveTo(XC - 5, YH - 2); ctx.lineTo(XC + 5, YH - 2); ctx.lineTo(XC, YH + 4); ctx.fill(); label(ctx, "injector", XC + 8, YH - 78, muted); }
+
+  // piston
+  ctx.fillStyle = metal2; ctx.strokeStyle = muted; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.rect(xL + 1, yPist, BORE - 2, PISTON); ctx.fill(); ctx.stroke();
+  if (!otto) { ctx.fillStyle = rgb(gasFill(s)); ctx.beginPath(); ctx.ellipse(XC, yPist, bowlW / 2, bowlD, 0, 0, Math.PI); ctx.fill(); }
+  ctx.strokeStyle = css("--panel"); for (const dy of [9, 15, 21]) { ctx.beginPath(); ctx.moveTo(xL + 1, yPist + dy); ctx.lineTo(xR - 1, yPist + dy); ctx.stroke(); }
+  // rod and crank
+  const ang = ca * Math.PI / 180, cpx = XC + rc * Math.sin(ang), cpy = yc - rc * Math.cos(ang), ppy = yPist + PIN;
+  ctx.fillStyle = metal; ctx.beginPath(); ctx.arc(XC, yc, rc + 16, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = metal2; ctx.beginPath(); ctx.arc(XC - (rc - 4) * Math.sin(ang), yc + (rc - 4) * Math.cos(ang), 34, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = metal2; ctx.lineWidth = 16; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(XC, ppy); ctx.lineTo(cpx, cpy); ctx.stroke(); ctx.lineCap = "butt";
+  ctx.fillStyle = ink; for (const [x, y, r] of [[XC, ppy, 6], [cpx, cpy, 8], [XC, yc, 6]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+  // TDC / BDC ticks
+  ctx.strokeStyle = muted; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  for (const [y, t] of [[YH + hc, "TDC"], [yBDC, "BDC"]]) { ctx.beginPath(); ctx.moveTo(xR + lw + 4, y); ctx.lineTo(xR + lw + 22, y); ctx.stroke(); label(ctx, t, xR + lw + 25, y + 4, muted); }
+  ctx.setLineDash([]);
+
+  // flows
+  const tt = time / 1000, inC = rgb(C.cycle === "otto" ? COL.freshOtto : COL.air), exC = rgb(COL.exhaust);
+  if (four) {
+    if (valveLift("in", s) > 0.15) arrowChain(ctx, [[XC - 90, YH - 40], [XC - 38, YH - 40], [XC - 38, YH + 30]], inC, tt);
+    if (valveLift("ex", s) > 0.15) arrowChain(ctx, [[XC + 38, YH + 30], [XC + 38, YH - 40], [XC + 95, YH - 40]], exC, tt);
+  } else if (otto) {
+    const exOpen = ideal ? s.ph === "heatout" : yPist > portTop(100) + 1, tpOpen = ideal ? s.ph === "heatout" : yPist > portTop(120) + 1;
+    const ex = portTop(100), tp = portTop(120);
+    if (exOpen) arrowChain(ctx, [[xR - 30, ex + 14], [xR + lw + 70, ex + 14]], exC, tt);
+    if (tpOpen) { arrowChain(ctx, [[xL - lw - 20, wallBot - 10], [xL - lw - 20, tp + 10], [xL + 20, tp + 6], [xL + 30, YH + 30], [XC, YH + 14]], inC, tt, 4);
+                  arrowChain(ctx, [[xL + 10, tp + 20], [xR + lw + 60, ex + 24]], rgb(COL.freshOtto, 0.9), tt * 1.3, 2); }
+    if (s.ph === "compression" || s.ph === "advance") arrowChain(ctx, [[XC - 200, wallBot + 30], [XC - 125, wallBot + 30]], inC, tt, 2);
+  } else {
+    const ip = portTop(130), inOpen = ideal ? s.ph === "heatout" : yPist > ip + 1;
+    if (inOpen) { arrowChain(ctx, [[xL - lw - 30, yBDC - 6], [xL + 25, yBDC - 6], [xL + 40, YH + 20]], inC, tt); arrowChain(ctx, [[xR + lw + 30, yBDC - 6], [xR - 25, yBDC - 6], [xR - 40, YH + 20]], inC, tt); }
+    if (valveLift("ex", s) > 0.15) { arrowChain(ctx, [[XC - 36, YH + 20], [XC - 36, YH - 70]], exC, tt); arrowChain(ctx, [[XC + 36, YH + 20], [XC + 36, YH - 70]], exC, tt); }
+  }
+  // labels: model badge and gas legend
+  ctx.font = "600 12px " + css("--font-body");
+  label(ctx, ideal ? "IDEAL AIR-STANDARD MODEL" : "REAL ENGINE (MODEL)", 12, 20, ideal ? css("--ideal") : css("--real"), 12);
+  label(ctx, `${otto ? "Otto (spark ignition)" : "Diesel (compression ignition)"} · ${four ? "four-stroke" : (otto ? "two-stroke, crankcase scavenged" : "two-stroke, uniflow scavenged")}`, 12, 36, muted, 11);
+}
+function label(ctx, t, x, y, color, size = 11) { ctx.fillStyle = color; ctx.font = `500 ${size}px ${css("--font-body") || "sans-serif"}`; ctx.fillText(t, x, y); }
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+// ------------------------------------------------------------------ P-v diagram
+const PW = 560, PH = 440, M = { l: 58, r: 18, t: 18, b: 46 };
+function pvScales() {
+  const vmax = Math.ceil((C.V1 * 1.06) / 100) * 100;
+  const pmaxRaw = Math.max(METRICS.peakI, METRICS.peakR) * 1.08;
+  const pmax = Math.ceil(pmaxRaw / 10) * 10;
+  const x = (v) => M.l + (v / vmax) * (PW - M.l - M.r);
+  const lo = 0.5, hi = 200;
+  const y = S.logP ? (p) => PH - M.b - (Math.log10(clamp(p, lo, hi)) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo)) * (PH - M.t - M.b)
+                   : (p) => PH - M.b - (p / pmax) * (PH - M.t - M.b);
+  return { x, y, vmax, pmax, lo, hi };
+}
+function drawPV(idx) {
+  const ctx = fit($("pv"), PW, PH), sc = pvScales();
+  const ink = css("--ink"), muted = css("--muted"), grid = css("--grid"), cI = css("--ideal"), cR = css("--real");
+  ctx.clearRect(0, 0, PW, PH);
+  ctx.font = `12px ${css("--font-mono")}`; ctx.lineWidth = 1;
+  // grid and ticks
+  ctx.strokeStyle = grid; ctx.fillStyle = muted;
+  for (let v = 0; v <= sc.vmax; v += 100) { const X = sc.x(v); ctx.beginPath(); ctx.moveTo(X, M.t); ctx.lineTo(X, PH - M.b); ctx.stroke(); ctx.textAlign = "center"; ctx.fillText(v, X, PH - M.b + 16); }
+  const pt = S.logP ? [0.5, 1, 2, 5, 10, 20, 50, 100, 200] : Array.from({ length: Math.floor(sc.pmax / 10) + 1 }, (_, i) => i * 10);
+  for (const p of pt) { const Y = sc.y(p); ctx.beginPath(); ctx.moveTo(M.l, Y); ctx.lineTo(PW - M.r, Y); ctx.stroke(); ctx.textAlign = "right"; ctx.fillText(p, M.l - 6, Y + 4); }
+  ctx.textAlign = "center"; ctx.fillStyle = ink; ctx.font = `600 12px ${css("--font-body")}`;
+  ctx.fillText("Cylinder volume, V (cm³)", (M.l + PW - M.r) / 2, PH - 8);
+  ctx.save(); ctx.translate(15, (M.t + PH - M.b) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(S.logP ? "Pressure, P (bar, log scale)" : "Pressure, P (bar)", 0, 0); ctx.restore();
+  // TDC/BDC lines
+  ctx.strokeStyle = muted; ctx.setLineDash([4, 4]);
+  for (const [v, t] of [[C.Vc, "TDC"], [C.V1, "BDC"]]) { const X = sc.x(v); ctx.beginPath(); ctx.moveTo(X, M.t); ctx.lineTo(X, PH - M.b); ctx.stroke(); ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.font = `11px ${css("--font-body")}`; ctx.fillText(t, X, M.t + 10); }
+  ctx.setLineDash([]);
+  // P1 = 1 bar reference
+  ctx.strokeStyle = grid; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M.l, sc.y(1)); ctx.lineTo(PW - M.r, sc.y(1)); ctx.stroke();
+  const path = (arr) => { ctx.beginPath(); arr.forEach((p, i) => { const X = sc.x(p.V), Y = sc.y(p.P); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.closePath(); };
+  const curC = S.model === "ideal" ? cI : cR, othC = S.model === "ideal" ? cR : cI;
+  if (S.compare) { ctx.globalAlpha = 0.45; ctx.strokeStyle = othC; ctx.lineWidth = 1.6; ctx.setLineDash([5, 4]); path(OTHER); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+  ctx.globalAlpha = 0.09; ctx.fillStyle = curC; path(TRACK); ctx.fill("evenodd"); ctx.globalAlpha = 1;
+  ctx.strokeStyle = curC; ctx.lineWidth = 2.2; path(TRACK); ctx.stroke();
+  // state labels / events
+  ctx.font = `600 13px ${css("--font-body")}`;
+  const lab = (V, P, t, dx, dy, col) => { ctx.fillStyle = col; ctx.textAlign = "left"; ctx.fillText(t, sc.x(V) + dx, sc.y(P) + dy); };
+  const st = ID.states, idCol = S.model === "ideal" ? cI : (S.compare ? cI : null);
+  if (idCol) {
+    lab(C.V1, st.P1, "1", 6, 16, idCol); lab(C.Vc, st.P2, "2", -16, 4, idCol); lab(st.V3, st.P3, "3", 6, -4, idCol); lab(C.V1, st.P4, "4", 6, 0, idCol);
+  }
+  if (S.model === "real" || S.compare) {
+    const ev = realEvents();
+    ctx.font = `11px ${css("--font-body")}`;
+    for (const e of ev) { const p = RE.samples[Math.round(e.th) % C.len]; const X = sc.x(p.V), Y = sc.y(p.P);
+      ctx.fillStyle = cR; ctx.beginPath(); ctx.arc(X, Y, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.textAlign = "left"; ctx.fillText(e.name, X + e.dx, Y + e.dy); }
+  }
+  // trail and dot
+  const N = 36; ctx.strokeStyle = curC; ctx.lineWidth = 5; ctx.lineCap = "round"; ctx.globalAlpha = 0.35; ctx.beginPath();
+  for (let i = N; i >= 0; i--) { const p = TRACK[(idx - i + TRACK.length) % TRACK.length]; const X = sc.x(p.V), Y = sc.y(p.P); i === N ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y); }
+  ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = "butt";
+  const p = TRACK[idx]; const X = sc.x(p.V), Y = sc.y(p.P);
+  ctx.fillStyle = css("--panel"); ctx.beginPath(); ctx.arc(X, Y, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = curC; ctx.beginPath(); ctx.arc(X, Y, 6, 0, Math.PI * 2); ctx.fill();
+  // legend
+  ctx.font = `600 12px ${css("--font-body")}`; ctx.textAlign = "left";
+  const lx = PW - M.r - 170, ly = M.t + 28;
+  ctx.fillStyle = curC; ctx.fillRect(lx, ly - 4, 22, 3); ctx.fillText(S.model === "ideal" ? "Ideal (air-standard)" : "Real (model)", lx + 28, ly);
+  if (S.compare) { ctx.strokeStyle = othC; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(lx, ly + 16); ctx.lineTo(lx + 22, ly + 16); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = othC; ctx.fillText(S.model === "ideal" ? "Real (model)" : "Ideal (air-standard)", lx + 28, ly + 20); }
+}
+function realEvents() {
+  const e = [], ev = C.ev;
+  if (C.strokes === 4) { e.push({ th: ev.IVC, name: "intake closes", dx: -84, dy: 16 }, { th: ev.EVO, name: "exhaust opens", dx: -40, dy: -12 }); }
+  else if (C.cycle === "otto") e.push({ th: ev.EPC, name: "exhaust port closes", dx: -120, dy: 16 }, { th: ev.EPO, name: "exhaust port opens", dx: -60, dy: -12 });
+  else e.push({ th: ev.EVC, name: "exhaust valve closes", dx: -126, dy: 16 }, { th: ev.EVO, name: "exhaust valve opens", dx: -60, dy: -12 });
+  if (C.cycle === "otto") e.push({ th: C.spark, name: "spark", dx: 7, dy: 12 });
+  else e.push({ th: C.SOI, name: "injection starts", dx: 7, dy: 14 });
+  return e;
+}
+
+// ------------------------------------------------------------------ timeline
+const TW = 1000, TH = 92, TL0 = 150;
+function drawTimeline(idx) {
+  const ctx = fit($("tl"), TW, TH), L = C.len, x = (th) => TL0 + (th / L) * (TW - TL0 - 12);
+  const muted = css("--muted"), ink = css("--ink"), grid = css("--grid"), cI = css("--ideal"), cR = css("--real");
+  ctx.clearRect(0, 0, TW, TH);
+  const bands = C.strokes === 4 ? [["Intake", 0, 180], ["Compression", 180, 360], ["Power", 360, 540], ["Exhaust", 540, 720]]
+                                : [["Upstroke: compression", 0, 180], ["Downstroke: power", 180, 360]];
+  const shades = [css("--band-a"), css("--band-b")];
+  bands.forEach(([n, a, b], i) => { ctx.fillStyle = shades[i % 2]; ctx.fillRect(x(a), 8, x(b) - x(a), 26); ctx.fillStyle = ink; ctx.font = `600 12px ${css("--font-body")}`; ctx.textAlign = "center"; ctx.fillText(n, (x(a) + x(b)) / 2, 25); });
+  // dead centers
+  ctx.font = `10px ${css("--font-mono")}`; ctx.fillStyle = muted;
+  const dcs = C.strokes === 4 ? [[0, "TDC"], [180, "BDC"], [360, "TDC"], [540, "BDC"], [720, "TDC"]] : [[0, "BDC"], [180, "TDC"], [360, "BDC"]];
+  for (const [t, n] of dcs) { ctx.textAlign = "center"; ctx.fillText(n, clamp(x(t), 18, TW - 18), 46); }
+  // open intervals: rows for intake (blue) and exhaust (red), plus fire marker
+  const ideal = S.model === "ideal", row = (y, a, b, col) => { ctx.fillStyle = col; if (b >= a) ctx.fillRect(x(a), y, x(b) - x(a), 7); else { ctx.fillRect(x(a), y, x(L) - x(a), 7); ctx.fillRect(x(0), y, x(b) - x(0), 7); } };
+  ctx.globalAlpha = 0.85;
+  let intake, exhaust;
+  if (C.strokes === 4) { intake = ideal ? [0, 180] : [C.ev.IVO, C.ev.IVC]; exhaust = ideal ? [540, 720] : [C.ev.EVO, C.ev.EVC]; }
+  else if (C.cycle === "otto") { intake = ideal ? [356, 360] : [C.ev.TPO, C.ev.TPC]; exhaust = ideal ? [354, 360] : [C.ev.EPO, C.ev.EPC]; }
+  else { intake = ideal ? [356, 360] : [C.ev.IPO, C.ev.IPC]; exhaust = ideal ? [354, 360] : [C.ev.EVO, C.ev.EVC]; }
+  row(54, intake[0], intake[1], cI); row(65, exhaust[0], exhaust[1], cR);
+  ctx.globalAlpha = 1; ctx.textAlign = "left"; ctx.font = `10px ${css("--font-body")}`;
+  ctx.fillStyle = cI; ctx.fillText(C.strokes === 4 ? "Intake valve open" : (C.cycle === "otto" ? "Transfer ports open" : "Intake ports open"), 8, 61);
+  ctx.fillStyle = cR; ctx.fillText(C.strokes === 4 || C.cycle === "diesel" ? "Exhaust valve open" : "Exhaust port open", 8, 72);
+  ctx.fillStyle = muted; ctx.fillText("Stroke", 8, 25); ctx.fillText("Dead center", 8, 46); ctx.fillText(ideal ? "Heat addition" : (C.cycle === "otto" ? "Spark" : "Injection starts"), 8, 86);
+  const fire = ideal ? C.tdc : (C.cycle === "otto" ? C.spark : C.SOI);
+  ctx.fillStyle = css("--fire"); ctx.beginPath(); ctx.moveTo(x(fire), 76); ctx.lineTo(x(fire) - 5, 86); ctx.lineTo(x(fire) + 5, 86); ctx.fill();
+  // cursor
+  const th = TRACK[idx].th; ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x(th), 4); ctx.lineTo(x(th), TH - 2); ctx.stroke();
+}
+
+// ------------------------------------------------------------------ loop
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (S.playing) S.pos = (S.pos + dt * RATE * S.speed) % TRACK.length;
+  const idx = Math.floor(S.pos);
+  const s = TRACK[idx];
+  drawEngine(s, now); drawPV(idx); drawTimeline(idx); renderNow(s);
+  $("scrub").value = idx;
+  requestAnimationFrame(frame);
+}
+
+// ------------------------------------------------------------------ controls
+function seg(groupId, key, parse = (v) => v) {
+  document.querySelectorAll(`#${groupId} button`).forEach((b) => b.addEventListener("click", () => {
+    S[key] = parse(b.dataset.v);
+    document.querySelectorAll(`#${groupId} button`).forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    const keepTh = TRACK ? TRACK[Math.floor(S.pos)].th : 0;
+    build();
+    if (key === "model") seekTh(keepTh);
+  }));
+}
+function seekTh(th) { let best = 0, bd = 1e9; TRACK.forEach((p, i) => { const d = Math.abs(p.th - th); if (d < bd - 1e-9) { bd = d; best = i; } }); S.pos = best; }
+function setPlaying(p) { S.playing = p; $("play").textContent = p ? "Pause" : "Play"; $("play").setAttribute("aria-pressed", p ? "true" : "false"); }
+
+window.addEventListener("DOMContentLoaded", () => {
+  seg("gCycle", "cycle"); seg("gStroke", "strokes", Number); seg("gModel", "model");
+  $("compare").addEventListener("change", (e) => S.compare = e.target.checked);
+  $("logp").addEventListener("change", (e) => S.logP = e.target.checked);
+  $("play").addEventListener("click", () => setPlaying(!S.playing));
+  $("back").addEventListener("click", () => { setPlaying(false); S.pos = (Math.floor(S.pos) - 5 + TRACK.length) % TRACK.length; });
+  $("fwd").addEventListener("click", () => { setPlaying(false); S.pos = (Math.floor(S.pos) + 5) % TRACK.length; });
+  $("speed").addEventListener("change", (e) => S.speed = Number(e.target.value));
+  $("scrub").addEventListener("input", (e) => { setPlaying(false); S.pos = Number(e.target.value); });
+  const tl = $("tl");
+  const seekFromTl = (ev) => { const r = tl.getBoundingClientRect(); const f = clamp((ev.clientX - r.left) / r.width * TW, TL0, TW - 12); setPlaying(false); seekTh((f - TL0) / (TW - TL0 - 12) * C.len); };
+  tl.addEventListener("pointerdown", (ev) => { seekFromTl(ev); tl.setPointerCapture(ev.pointerId); });
+  tl.addEventListener("pointermove", (ev) => { if (ev.buttons) seekFromTl(ev); });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.code === "Space") { e.preventDefault(); setPlaying(!S.playing); }
+    if (e.code === "ArrowRight") { setPlaying(false); S.pos = (Math.floor(S.pos) + 1) % TRACK.length; }
+    if (e.code === "ArrowLeft") { setPlaying(false); S.pos = (Math.floor(S.pos) - 1 + TRACK.length) % TRACK.length; }
+  });
+  build();
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setPlaying(false); S.pos = TRACK.findIndex((p) => p.ph === "compression") + 120; }
+  requestAnimationFrame(frame);
+});
+
+</script>
+</body>
+</html>
