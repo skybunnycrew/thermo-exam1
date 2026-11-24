@@ -2,7 +2,7 @@
 Adds a "Final exam" tab with
   - exam-level problems: X1-X8 (gen_final2.py) plus E19, E20 (Brayton, held off the Exam 2 page on Nov 11)
   - harder problems: F1-F9 (gen_final.py) plus C10-C12 (held off the Exam 2 page on Nov 11)
-a Final practice exam (five problems, 110 minutes, 100 points), a final-exam progress track on the home page,
+a Final practice exam (six problems, cumulative, 110 minutes, 100 points; Matthew confirmed Nov 24 the final is cumulative and in person), a final-exam progress track on the home page,
 and the final's date and scope in the countdown.
 Usage: python3 patch_final.py ../index.html final2_templates.json final_templates.json"""
 import json, sys
@@ -38,7 +38,7 @@ rep("  .hero{grid-template-columns:1fr}", "  .hero{grid-template-columns:minmax(
 
 # ---------- config: the final's date and scope
 rep('{name:"Final exam", date:"2026-12-08", time:"10:00–11:50 a.m.", where:"finals week", covers:"the whole course", ready:false}',
-    '{name:"Final exam", date:"2026-12-08", time:"10:00–11:50 a.m.", where:"finals week", covers:"the Ch. 9 and 10 cycles after Exam 2, built on the Ch. 5–7 skills", ready:true}')
+    '{name:"Final exam", date:"2026-12-08", time:"10:00–11:50 a.m.", where:"finals week", covers:"the whole course, including the Ch. 9 and 10 cycles taught after Exam 2", ready:true}')
 
 # ---------- registry
 rep("const TPL = {}; BANK.templates.concat(BANK3.templates, BANK4.templates).forEach(t => TPL[t.id] = t);",
@@ -66,7 +66,7 @@ rep("function pickVariant(tid){", r"""function viewFinal(app){
   G = null;
   const ex = BANK5.templates.filter(t => t.tier === "exam"), hard = BANK5.templates.filter(t => t.tier !== "exam");
   const solid = ORDER5X.filter(id => status(id) === "solid").length;
-  app.append(el(`<section><h2>Final exam practice</h2><p class="muted" style="margin-top:4px">The cycles taught after Exam 2: Diesel, Brayton and its improvements, jet propulsion, Stirling and Ericsson, the Rankine cycle with reheat and regeneration, cogeneration, and combined gas-steam plants. Every one is still a set of Ch. 5 control volumes, a property table and a Ch. 6–7 limit, so the Exam 2 problems on the Guided problems tab are review for the final too. Same eight steps, same Worked, Guided and Solo modes, new numbers every time. Check Canvas for the final exam topics list.</p></section>`));
+  app.append(el(`<section><h2>Final exam practice</h2><p class="muted" style="margin-top:4px">The final is cumulative and in person: everything from Ch. 1 on. This tab holds the new material, the cycles taught after Exam 2: Diesel, Brayton and its improvements, jet propulsion, Stirling and Ericsson, the Rankine cycle with reheat and regeneration, cogeneration, and combined gas-steam plants. Every one is still a set of Ch. 5 control volumes, a property table and a Ch. 6–7 limit, so the Exam 1 and Exam 2 problems on the Guided problems tab are part of final prep too. Same eight steps, same Worked, Guided and Solo modes, new numbers every time. Check Canvas for the final exam topics list.</p></section>`));
   app.append(el(`<section class="grid2">
       <div class="card list"><div class="eyebrow">How to use this tab</div>
         <ul class="clean small"><li>Start with the <b>exam-level</b> problems: Worked first, then Guided, then Solo.</li>
@@ -101,7 +101,7 @@ rep("function pickVariant(tid){", r"""function viewFinal(app){
   };
   block("Exam level", ex, "Two are in US units (°F, psia, Btu), as old finals were; the English tables have an E after the number.");
   block("Harder than the final: Challenge and Hardest", hard, "Several are remade from past ENGR&amp;224 finals with new numbers.");
-  const rev = el(`<section class="card list"><div class="eyebrow">Review from Exam 2</div><p class="small">The Diesel and dual cycles (Otto too) and the Ch. 5–7 devices, second-law and entropy problems are on the Guided problems tab. The Exam 2 debrief habits still apply: name the system, write the full balance and cross out terms, and justify the property model.</p><div class="row"><button class="btn" id="tog">Guided problems</button><button class="btn" id="toc">Challenge problems</button></div></section>`);
+  const rev = el(`<section class="card list"><div class="eyebrow">Review: the rest of the course is on the final too</div><p class="small">The Guided problems tab has the Ch. 5–7 devices, second-law and entropy problems, the Otto, Diesel and dual cycles, and the Exam 1 problems (pressure, energy, property tables, closed systems and boundary work). The Exam 1 and Exam 2 debrief habits still apply: name the system, write the full balance and cross out terms, and justify the property model.</p><div class="row"><button class="btn" id="tog">Guided problems</button><button class="btn" id="toc">Challenge problems</button></div></section>`);
   $("#tog", rev).onclick = () => go("guided"); $("#toc", rev).onclick = () => go("challenge");
   app.append(rev);
 }
@@ -111,7 +111,7 @@ function pickVariant(tid){""")
 rep("""  app.append(el(`<section class="card exam2 list"><div class="eyebrow">New for Exam 2</div>""",
     """  app.append(el(`<section class="card exam2 list"><div class="eyebrow">New for the final</div>
       <p><b>Final exam tab:</b> ${ORDER5X.length} exam-level problems on Diesel and Brayton cycles, jet propulsion, the Rankine cycle with reheat and feedwater heaters, cogeneration and the steam Carnot cycle, plus ${ORDER5.length - ORDER5X.length} harder ones (combined cycles, Stirling and Ericsson, and remakes of past finals), each with a full worked solution in the eight steps.</p>
-      <p class="small muted">Then take the Final practice exam: five problems, 110 minutes, like the real slot.</p>
+      <p class="small muted">Then take the Final practice exam: six problems from the whole course, 110 minutes, like the real slot.</p>
       <div class="row"><button class="btn primary" data-go="final">Final exam problems</button><button class="btn" id="hfex">Final practice exam</button></div></section>`));
   app.append(el(`<section class="card exam2 list"><div class="eyebrow">Exam 2 drills, still useful</div>""")
 rep("  $$(\"[data-go]\", app).forEach(b => b.onclick = () => go(b.dataset.go));",
@@ -134,12 +134,12 @@ rep("The bunny eats a lettuce once two of that topic's problems are solid, then 
     "The bunny is working toward the final now. It eats a lettuce once two of that topic's exam-level problems are solid (one, where a topic has only one), then hops on to the next;")
 rep("Properties turn solid at 80% over 15 states, and Which table? at 80% over 20 cards.", "Properties turn solid at 80% over 15 states.")
 rep('<p class="small muted">Six problems, two hours, 100 points: Exam 2 by default, Exam 1 for review.</p>',
-    '<p class="small muted">The Final by default: five problems, 110 minutes, 100 points. Exams 1 and 2 stay for review.</p>')
+    '<p class="small muted">The Final by default: six problems from the whole course, 110 minutes, 100 points. Exams 1 and 2 stay for review.</p>')
 
 # ---------- practice exam: the Final
-rep('const SLOTS3 = ', 'const SLOTS5 = [{ids:["E17","X1","E19","E20","X2"], pts:20}, {ids:["X4","X5"], pts:20}, {ids:["X6","X7","F3"], pts:22}, {ids:["X3","X8","F6","F7"], pts:18}, {ids:["E3","E6","E7","E10","E11","E13","E14"], pts:20}];\nconst SLOTS3 = ')
+rep('const SLOTS3 = ', 'const SLOTS5 = [{ids:["E17","X1","E19","E20","X2"], pts:18}, {ids:["X4","X5"], pts:18}, {ids:["X6","X7","F3"], pts:20}, {ids:["X3","X8","F6","F7"], pts:14}, {ids:["T9","T10","T11","T12","T13"], pts:15}, {ids:["E3","E6","E7","E10","E11","E13","E14"], pts:15}];\nconst SLOTS3 = ')
 rep('const EXDEF = {\n', 'const EXDEF = {\n'
-    '  fin:{name:"Final", covers:"Ch. 9 and 10, built on Ch. 5–7", mins:110, intro:"Five problems shaped like a final: a gas power cycle (Diesel or Brayton), a Rankine cycle, an improved Rankine cycle or cogeneration plant, a jet engine, steam Carnot, Stirling or Ericsson problem, and one Ch. 5–7 review problem (a device, a second-law claim, or entropy).", tables:"Çengel tables (A-1, A-2a, A-4 to A-6, A-17, and A-2Ea, A-4E to A-6E for US units)"},\n')
+    '  fin:{name:"Final", covers:"the whole course (cumulative)", mins:110, intro:"Six problems shaped like a cumulative final: a gas power cycle (Diesel or Brayton), a Rankine cycle, an improved Rankine cycle or cogeneration plant, a jet engine, steam Carnot, Stirling or Ericsson problem, one Ch. 4 closed-system problem, and one Ch. 5–7 problem (a device, a second-law claim, or entropy).", tables:"Çengel tables (A-1, A-2a, A-4 to A-6, A-17, and A-2Ea, A-4E to A-6E for US units)"},\n')
 rep("function newExam(which){\n  which = which || S.exsel || \"e2\";",
     "function newExam(which){\n  which = which || S.exsel || \"fin\";\n  if (which === \"fin\") return {id:Date.now(), which, probs:SLOTS5.map(sl => { const tid = sl.ids[rnd(sl.ids.length)]; return {k:\"tpl\", tid, vi:rnd(TPL[tid].v.length), pts:sl.pts}; }), ans:{}, self:{}, left:110 * 60, paused:false, cur:0, graded:false};")
 rep('  const X = S.exsel || "e2", D = EXDEF[X];', '  const X = S.exsel || "fin", D = EXDEF[X];')
@@ -158,7 +158,8 @@ rep('        ${X !== "e1" ? `<ul class="clean"><li>Mass balance',
         <li>Feedwater heaters: open (mixing) and closed (no mixing, drain pumped forward or trapped back) energy balances for y</li>
         <li>Cogeneration: utilization factor ε<sub>u</sub> = (Ẇ<sub>net</sub> + Q̇<sub>p</sub>)/Q̇<sub>in</sub>; combined cycles: the heat-recovery steam generator balance links the two loops</li>
         <li>Carnot limit in kelvins; entropy generation in each device and at each reservoir</li>
-        <li>Your property-model rules: steam tables for water in every phase; A-17 or cold-air-standard for air, as the problem says</li></ul>` : X !== "e1" ? `<ul class="clean"><li>Mass balance''')
+        <li>Your property-model rules: steam tables for water in every phase; A-17 or cold-air-standard for air, as the problem says</li>
+        <li>From Exam 1: pressure and manometers, boundary work for each process (constant P, polytropic, spring), the closed-system first law, quality and the T-v/P-v diagrams, ideal gas and when it fails</li></ul>` : X !== "e1" ? `<ul class="clean"><li>Mass balance''')
 
 open(DST, "w", encoding="utf-8").write(html)
 print("ok", len(html), [t["id"] for t in tpls])

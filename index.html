@@ -330,7 +330,7 @@ const MISS_COUNT_URL = "";   // Paste your Google Apps Script web-app URL here t
 const EXAMS = [
   {name:"Exam 1", date:"2026-10-16", time:"10:00 a.m.–12:00 p.m.", where:"in person", covers:"Ch. 1–4", ready:true},
   {name:"Exam 2", date:"2026-11-20", time:"10:00 a.m.–12:00 p.m.", where:"in person", covers:"Ch. 5–7 and Ch. 9: Otto, Diesel and dual cycles", ready:true},
-  {name:"Final exam", date:"2026-12-08", time:"10:00–11:50 a.m.", where:"finals week", covers:"the Ch. 9 and 10 cycles after Exam 2, built on the Ch. 5–7 skills", ready:true}
+  {name:"Final exam", date:"2026-12-08", time:"10:00–11:50 a.m.", where:"finals week", covers:"the whole course, including the Ch. 9 and 10 cycles taught after Exam 2", ready:true}
 ];
 const KEY = "engr224-prep-v1";
 const VER = BANK2.version;
@@ -725,7 +725,7 @@ function viewHome(app){
     </section>`));
   app.append(el(`<section class="card exam2 list"><div class="eyebrow">New for the final</div>
       <p><b>Final exam tab:</b> ${ORDER5X.length} exam-level problems on Diesel and Brayton cycles, jet propulsion, the Rankine cycle with reheat and feedwater heaters, cogeneration and the steam Carnot cycle, plus ${ORDER5.length - ORDER5X.length} harder ones (combined cycles, Stirling and Ericsson, and remakes of past finals), each with a full worked solution in the eight steps.</p>
-      <p class="small muted">Then take the Final practice exam: five problems, 110 minutes, like the real slot.</p>
+      <p class="small muted">Then take the Final practice exam: six problems from the whole course, 110 minutes, like the real slot.</p>
       <div class="row"><button class="btn primary" data-go="final">Final exam problems</button><button class="btn" id="hfex">Final practice exam</button></div></section>`));
   app.append(el(`<section class="card exam2 list"><div class="eyebrow">Exam 2 drills, still useful</div>
       <p><b>Properties:</b> water and R-134a states, entropy included, with tricky ones and states inside turbines, compressors, valves and tanks.</p>
@@ -762,7 +762,7 @@ function viewHome(app){
       <div><b>Worked example</b><p class="small muted">Predict each of the eight steps before you reveal it.</p></div>
       <div><b>Guided</b><p class="small muted">Do every step yourself. Each one is checked, with a hint when it's wrong.</p></div>
       <div><b>Solo</b><p class="small muted">Answers only, like the exam. New numbers every time.</p></div>
-      <div><b>Practice exam</b><p class="small muted">The Final by default: five problems, 110 minutes, 100 points. Exams 1 and 2 stay for review.</p></div>
+      <div><b>Practice exam</b><p class="small muted">The Final by default: six problems from the whole course, 110 minutes, 100 points. Exams 1 and 2 stay for review.</p></div>
     </div>
     <p class="small muted" style="margin-top:10px">Mix in the Properties, Which table? and Triage drills: table lookups and recognizing what kind of problem you're facing are where most exam points go.</p></section>`));
   const reset = el(`<div class="row"><button class="btn quiet" id="reset">Reset my progress on this device</button><span class="small muted" id="resetmsg"></span></div>`);
@@ -837,7 +837,7 @@ function viewFinal(app){
   G = null;
   const ex = BANK5.templates.filter(t => t.tier === "exam"), hard = BANK5.templates.filter(t => t.tier !== "exam");
   const solid = ORDER5X.filter(id => status(id) === "solid").length;
-  app.append(el(`<section><h2>Final exam practice</h2><p class="muted" style="margin-top:4px">The cycles taught after Exam 2: Diesel, Brayton and its improvements, jet propulsion, Stirling and Ericsson, the Rankine cycle with reheat and regeneration, cogeneration, and combined gas-steam plants. Every one is still a set of Ch. 5 control volumes, a property table and a Ch. 6–7 limit, so the Exam 2 problems on the Guided problems tab are review for the final too. Same eight steps, same Worked, Guided and Solo modes, new numbers every time. Check Canvas for the final exam topics list.</p></section>`));
+  app.append(el(`<section><h2>Final exam practice</h2><p class="muted" style="margin-top:4px">The final is cumulative and in person: everything from Ch. 1 on. This tab holds the new material, the cycles taught after Exam 2: Diesel, Brayton and its improvements, jet propulsion, Stirling and Ericsson, the Rankine cycle with reheat and regeneration, cogeneration, and combined gas-steam plants. Every one is still a set of Ch. 5 control volumes, a property table and a Ch. 6–7 limit, so the Exam 1 and Exam 2 problems on the Guided problems tab are part of final prep too. Same eight steps, same Worked, Guided and Solo modes, new numbers every time. Check Canvas for the final exam topics list.</p></section>`));
   app.append(el(`<section class="grid2">
       <div class="card list"><div class="eyebrow">How to use this tab</div>
         <ul class="clean small"><li>Start with the <b>exam-level</b> problems: Worked first, then Guided, then Solo.</li>
@@ -872,7 +872,7 @@ function viewFinal(app){
   };
   block("Exam level", ex, "Two are in US units (°F, psia, Btu), as old finals were; the English tables have an E after the number.");
   block("Harder than the final: Challenge and Hardest", hard, "Several are remade from past ENGR&amp;224 finals with new numbers.");
-  const rev = el(`<section class="card list"><div class="eyebrow">Review from Exam 2</div><p class="small">The Diesel and dual cycles (Otto too) and the Ch. 5–7 devices, second-law and entropy problems are on the Guided problems tab. The Exam 2 debrief habits still apply: name the system, write the full balance and cross out terms, and justify the property model.</p><div class="row"><button class="btn" id="tog">Guided problems</button><button class="btn" id="toc">Challenge problems</button></div></section>`);
+  const rev = el(`<section class="card list"><div class="eyebrow">Review: the rest of the course is on the final too</div><p class="small">The Guided problems tab has the Ch. 5–7 devices, second-law and entropy problems, the Otto, Diesel and dual cycles, and the Exam 1 problems (pressure, energy, property tables, closed systems and boundary work). The Exam 1 and Exam 2 debrief habits still apply: name the system, write the full balance and cross out terms, and justify the property model.</p><div class="row"><button class="btn" id="tog">Guided problems</button><button class="btn" id="toc">Challenge problems</button></div></section>`);
   $("#tog", rev).onclick = () => go("guided"); $("#toc", rev).onclick = () => go("challenge");
   app.append(rev);
 }
@@ -1534,10 +1534,10 @@ let CLOCK = null;
 function stopClock(){ if (CLOCK){ clearInterval(CLOCK); CLOCK = null; } }
 const SLOTS = [["T1","T2"],["T3","T4"],"TABLE",["T6","T7","T8"],["T9","T10"],["T11","T12","T13"]];
 const SLOTS2 = ["TABLE2", ["E1","E2","E3","E4","E5"], ["E6","E7","E8","E9"], ["E10","E11","E12"], ["E13","E14","E15"], ["E16","E17","E18"]];
-const SLOTS5 = [{ids:["E17","X1","E19","E20","X2"], pts:20}, {ids:["X4","X5"], pts:20}, {ids:["X6","X7","F3"], pts:22}, {ids:["X3","X8","F6","F7"], pts:18}, {ids:["E3","E6","E7","E10","E11","E13","E14"], pts:20}];
+const SLOTS5 = [{ids:["E17","X1","E19","E20","X2"], pts:18}, {ids:["X4","X5"], pts:18}, {ids:["X6","X7","F3"], pts:20}, {ids:["X3","X8","F6","F7"], pts:14}, {ids:["T9","T10","T11","T12","T13"], pts:15}, {ids:["E3","E6","E7","E10","E11","E13","E14"], pts:15}];
 const SLOTS3 = ["TABLE2", ["C2","C15","P3"], ["C16","C3","P1"], ["C7","C8","P2","P9"], ["C1","C4","C5","C6","C9","P4","P5","P6","P7","P8"], ["C13","C14","C17"]];
 const EXDEF = {
-  fin:{name:"Final", covers:"Ch. 9 and 10, built on Ch. 5–7", mins:110, intro:"Five problems shaped like a final: a gas power cycle (Diesel or Brayton), a Rankine cycle, an improved Rankine cycle or cogeneration plant, a jet engine, steam Carnot, Stirling or Ericsson problem, and one Ch. 5–7 review problem (a device, a second-law claim, or entropy).", tables:"Çengel tables (A-1, A-2a, A-4 to A-6, A-17, and A-2Ea, A-4E to A-6E for US units)"},
+  fin:{name:"Final", covers:"the whole course (cumulative)", mins:110, intro:"Six problems shaped like a cumulative final: a gas power cycle (Diesel or Brayton), a Rankine cycle, an improved Rankine cycle or cogeneration plant, a jet engine, steam Carnot, Stirling or Ericsson problem, one Ch. 4 closed-system problem, and one Ch. 5–7 problem (a device, a second-law claim, or entropy).", tables:"Çengel tables (A-1, A-2a, A-4 to A-6, A-17, and A-2Ea, A-4E to A-6E for US units)"},
   e1:{name:"Exam 1", covers:"Ch. 1–4", intro:"Six problems shaped like Exam 1: pressure, energy, a table fill-in, properties, and two closed-system problems.", tables:"Çengel tables (A-1 to A-6)"},
   ec:{name:"Challenge", covers:"Ch. 5–7 and 9, harder than Exam 2", intro:"Six problems built to be harder than Exam 2: a water and R-134a table fill-in, then a multi-stream device, a heat exchanger with entropy generation, a second-law problem, an entropy problem and an Otto or Diesel cycle, all from the Challenge set. Most people won't finish in two hours; take it a few days before the exam, then study the worked solutions for whatever you didn't reach.", tables:"Çengel tables (A-1 to A-7, A-11 to A-13, A-17)"},
   e2:{name:"Exam 2", covers:"Ch. 5–7 and Ch. 9 (Otto, Diesel, dual)", intro:"Six problems for Exam 2: a water and R-134a table fill-in, a steady-flow device, a heat exchanger or mixing chamber, a second-law problem, an isentropic-efficiency problem, and a gas power cycle.", tables:"Çengel tables (A-1, A-2a, A-4 to A-7, A-11 to A-13, A-17)"}
@@ -1600,7 +1600,8 @@ function viewExam(app){
         <li>Feedwater heaters: open (mixing) and closed (no mixing, drain pumped forward or trapped back) energy balances for y</li>
         <li>Cogeneration: utilization factor ε<sub>u</sub> = (Ẇ<sub>net</sub> + Q̇<sub>p</sub>)/Q̇<sub>in</sub>; combined cycles: the heat-recovery steam generator balance links the two loops</li>
         <li>Carnot limit in kelvins; entropy generation in each device and at each reservoir</li>
-        <li>Your property-model rules: steam tables for water in every phase; A-17 or cold-air-standard for air, as the problem says</li></ul>` : X !== "e1" ? `<ul class="clean"><li>Mass balance: ∑ṁ<sub>in</sub> = ∑ṁ<sub>out</sub>; ṁ = ρAV = AV/v; V̇ = ṁv</li>
+        <li>Your property-model rules: steam tables for water in every phase; A-17 or cold-air-standard for air, as the problem says</li>
+        <li>From Exam 1: pressure and manometers, boundary work for each process (constant P, polytropic, spring), the closed-system first law, quality and the T-v/P-v diagrams, ideal gas and when it fails</li></ul>` : X !== "e1" ? `<ul class="clean"><li>Mass balance: ∑ṁ<sub>in</sub> = ∑ṁ<sub>out</sub>; ṁ = ρAV = AV/v; V̇ = ṁv</li>
         <li>Steady-flow first law: Q̇<sub>in</sub> + Ẇ<sub>in</sub> + ∑ṁ(h + V²/2 + gz)<sub>in</sub> − Q̇<sub>out</sub> − Ẇ<sub>out</sub> − ∑ṁ(h + V²/2 + gz)<sub>out</sub> = dE<sub>cv</sub>/dt, and which terms each device keeps</li>
         <li>V²/2 in kJ/kg: divide m²/s² by 1000; throttle: h<sub>2</sub> = h<sub>1</sub></li>
         <li>η<sub>th</sub> = W<sub>net</sub>/Q<sub>H</sub>; COP<sub>R</sub> = Q<sub>L</sub>/W; COP<sub>HP</sub> = Q<sub>H</sub>/W; Carnot limits in kelvins</li>
