@@ -80,18 +80,60 @@ th:first-child,td:first-child{text-align:left}
 footer{color:var(--dim);font-size:19px}
 footer a{color:var(--sky)}
 [hidden]{display:none!important}
+/* STANDARD STYLE (Nov 24, Matthew): a toggle at the top swaps the 8-bit look for a plain page in the exam-prep site's style:
+   white ground, Arial, EvCC red, ordinary buttons, no scanlines. The game screen keeps its drawings, shown light. */
+.stylebtn{font:9px/1.8 "Press Start 2P",monospace;background:none;border:2px solid var(--gold);color:var(--gold);padding:4px 10px;cursor:pointer;margin-left:auto}
+html.plain{color-scheme:light;--bg:#fff;--ink:#1a1a1a;--dim:#555;--mid:#c8c8c8;--red:#C00000;--hot:#C00000;--sky:#1a56a8;--grn:#1b6e1b;--gold:#C00000;--lav:#5a4aa8;--panel:#fff;--console:#f3f3f3;--console2:#e2e2e2}
+html.plain body{font:17px/1.5 Arial,Helvetica,sans-serif;background:#fff;color:#1a1a1a}
+html.plain .px,html.plain .site,html.plain .lv,html.plain .pill,html.plain .box h2,html.plain .tag,html.plain th,html.plain .metrics b,html.plain .card b,html.plain .ab span,html.plain .dpad .btn,html.plain .ab .btn,html.plain .stylebtn{font-family:Arial,Helvetica,sans-serif;letter-spacing:0}
+html.plain header.band{background:#C00000;color:#fff}
+html.plain h1{font:700 clamp(24px,3.4vw,34px)/1.2 Arial,Helvetica,sans-serif;color:#fff;text-shadow:none}
+html.plain header p{color:#fff;opacity:.95}
+html.plain .site{font-size:14px}html.plain .site a{color:#fff}
+html.plain .stylebtn{font-size:14px;font-weight:700;color:#fff;border-color:#fff;border-radius:6px;padding:6px 12px}
+html.plain .lv{font-size:14px;background:#fff;color:#1a1a1a;border:1px solid #c8c8c8;border-radius:8px}
+html.plain .lv b{color:#C00000;font-weight:700}
+html.plain .lv[aria-pressed=true]{background:#C00000;color:#fff;border-color:#C00000}html.plain .lv[aria-pressed=true] b{color:#fff}
+html.plain .lv.cmp{border-color:#1a56a8;color:#1a56a8}
+html.plain .lv:focus-visible,html.plain .btn:focus-visible,html.plain .pill:focus-visible{outline-color:#1a56a8}
+html.plain .console{background:#fff;border:1px solid #ddd;border-radius:10px;box-shadow:none}
+html.plain .bezel{background:#fff;padding:0}
+html.plain .screen{background:#fff;border:1px solid #ddd;border-radius:6px}
+html.plain .screen canvas{filter:invert(1) hue-rotate(180deg)}
+html.plain .screen.crt::after,html.plain #crt{display:none}
+html.plain .dpad .btn,html.plain .dpad i{background:#f0f0f0;color:#333;border:1px solid #d0d0d0;font-size:15px}
+html.plain .dpad .l{border-radius:8px 0 0 8px}html.plain .dpad .r{border-radius:0 8px 8px 0}html.plain .dpad .u{border-radius:8px 8px 0 0}html.plain .dpad .d{border-radius:0 0 8px 8px}html.plain .dpad i{border:0}
+html.plain .pill{font-size:14px;font-weight:700;background:#fff;color:#1a1a1a;border:1px solid #c8c8c8;border-radius:8px}
+html.plain .pill[aria-pressed=true]{background:#C00000;color:#fff;border-color:#C00000}
+html.plain .ab .btn{width:auto;height:44px;border-radius:8px;padding:0 16px;font-size:15px;font-weight:700;box-shadow:none;background:#C00000}
+html.plain .ab span{font-size:12px;color:#555}
+@media(max-width:600px){html.plain .ab{gap:8px}html.plain .ab .btn{padding:0 10px;font-size:14px}html.plain .pad{gap:8px}}
+html.plain .box{background:#fff;border:1px solid #ddd;border-radius:10px}
+html.plain .box h2{font-size:13px;font-weight:700;letter-spacing:.06em;color:#C00000}
+html.plain .beyond{border-left:4px solid #C00000}
+html.plain .tag{font-size:13px;color:#1a56a8}
+html.plain table{font-size:15px}html.plain th{font-size:12px;color:#555;font-weight:700}html.plain th,html.plain td{border-bottom-color:#e4e4e4}
+html.plain .metrics div{border-left-color:#C00000}html.plain .metrics b{font-size:12px;color:#555;font-weight:700}html.plain .metrics span{font-size:22px}html.plain .metrics small{font-size:14px}
+html.plain .note,html.plain footer{font-size:15px;color:#555}
+html.plain .card{background:#fff;border:1px solid #ddd;border-radius:10px}html.plain .card:hover,html.plain .card:focus-visible{border-color:#C00000}
+html.plain .card canvas{filter:invert(1) hue-rotate(180deg);background:#000}
+html.plain .card b{font-size:13px;color:#C00000;font-weight:700}
+html.plain .bar .t{background:#eee}html.plain .bar .c{background:repeating-linear-gradient(90deg,#c8c8d8 0 4px,#eee 4px 8px)}
+html.plain footer a,html.plain .beyond a{color:#1a56a8}
+
 @media(max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){.stack thead{display:none}.stack tr{display:grid;padding-block:8px;border-bottom:1px solid #303050}.stack td{display:flow-root;border:0;padding:2px 0;padding-inline-start:7.5em;text-align:start;white-space:normal}.stack td::before{content:attr(data-l);float:inline-start;width:7em;margin-inline-start:-7.5em;color:var(--dim)}body{font-size:20px}.pad{grid-template-columns:1fr 1fr}.mid{grid-column:1/3;order:3}.ab{justify-content:flex-end}
 .lv{font-size:9px;padding:8px}.bar{grid-template-columns:6.5em minmax(0,1fr) 3.6em}table{font-size:17px}}
 @media(prefers-reduced-motion:reduce){.screen.crt::after{display:none}}
 .stack td{white-space:normal}#ctab th,#ctab td{text-align:left}
 </style>
+<script>try{const q=new URLSearchParams(location.search).get("style");const v=q||localStorage.getItem("cq-style");if(v==="plain"||v==="standard")document.documentElement.classList.add("plain")}catch(e){}</script>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head>
 <body>
 <header class="band"><div class="wrap">
-  <nav class="site" aria-label="Site"><a href="./">← Exam prep</a><a href="otto-diesel.html">Otto and Diesel with real-engine models →</a></nav>
-  <h1>THERMO CYCLE QUEST</h1>
+  <nav class="site" aria-label="Site"><a href="./">← Exam prep</a><a href="otto-diesel.html">Otto and Diesel with real-engine models →</a><button class="stylebtn" id="stylebtn" type="button" aria-pressed="false">STANDARD PAGE</button></nav>
+  <h1 id="ttl">THERMO CYCLE QUEST</h1>
   <p>Every power cycle in ENGR&amp;224, in motion. Each device runs in step with its state point on the P-v and T-s diagrams. Pick a world, or press COMPARE to see them all at once. World 4-0 shows why nobody builds a Carnot cycle with steam.</p>
 </div></header>
 
@@ -554,7 +596,13 @@ function beep(i) {
 // ---------------------------------------------------------------- controls
 function go(k) { lvl = (k + BASE.length) % BASE.length; alt = false; if (!$("cmp").hidden) showCompare(false); setup(); }
 function stage() { const [i] = at(u); let w = 0; for (let k = 0; k <= i; k++) w += cyc.procs[k].w; u = Math.floor(u / Wtot) * Wtot + w + 1e-6; }
-function setPlay(p) { playing = p; $("alab").textContent = p ? "PAUSE" : "PLAY"; }
+const PLAIN = () => document.documentElement.classList.contains("plain");
+const LAB = {ttl:["THERMO CYCLE QUEST", "Thermodynamic cycle animations"], sel:["SELECT", "Variant"], start:["START", "Restart"], log:["LOG P-v", "Log P-v"], snd:["SOUND", "Sound"],
+  bbtn:["B", "Next stage"], stylebtn:["STANDARD PAGE", "Retro style"]};
+function labels() { const k = PLAIN() ? 1 : 0; for (const id in LAB) $(id).textContent = LAB[id][k]; $("stylebtn").setAttribute("aria-pressed", k === 1);
+  $("abtn").textContent = k ? (playing ? "Pause" : "Play") : "A"; $("alab").textContent = k ? "" : (playing ? "PAUSE" : "PLAY"); $("bbtn").nextElementSibling.textContent = k ? "" : "STAGE"; }
+function setPlay(p) { playing = p; labels(); }
+$("stylebtn").onclick = () => { const on = document.documentElement.classList.toggle("plain"); try { localStorage.setItem("cq-style", on ? "plain" : "retro"); } catch (e) {} labels(); };
 $("levels").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; if (b.id === "cmpb") showCompare(true); else go(+b.dataset.k); });
 $("cards").addEventListener("click", e => { const b = e.target.closest(".card"); if (b) { go(+b.dataset.k); window.scrollTo({top: 0}); } });
 $("prev").onclick = () => go(lvl - 1); $("next").onclick = () => go(lvl + 1);
@@ -575,7 +623,7 @@ window.addEventListener("hashchange", route);
 $("srcs").textContent = "";
 buildCompare();
 if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) setPlay(false);
-lvl = 0; route();
+labels(); lvl = 0; route();
 (document.fonts && document.fonts.load ? document.fonts.load('8px "Press Start 2P"') : Promise.resolve()).catch(() => {}).finally(() => requestAnimationFrame(frame));
 }
 
